@@ -16,15 +16,15 @@ const publicAgent = axios.create({
 
 privateAgent.interceptors.request.use(
   (config) => {
-    // Get token from secure cookies (primary source)
-    const accessToken = Cookies.get('token');
+    // Get token from cookies or localStorage (support both during transition)
+    const accessToken = Cookies.get('token') || localStorage.getItem('kalleenepal_token');
     if (accessToken && config.headers) {
       config.headers['Authorization'] = `Bearer ${accessToken}`;
     }
     return config;
   },
   (error) => {
-    console.error('Request Error:', error.response.data.message);
+    console.error('Request Error:', error?.response?.data || error.message || error);
     return Promise.reject(error);
   }
 );
@@ -60,31 +60,39 @@ privateAgent.interceptors.response.use(
       // Normal 401 - try to refresh token
       if (!originalRequest._retry) {
         originalRequest._retry = true;
-        const refreshToken = Cookies.get('refreshToken');
-        
+        const refreshToken = Cookies.get('refreshToken') || localStorage.getItem('kalleenepal_refresh_token');
+
         if (!refreshToken) return Promise.reject(error);
 
         try {
-          const refreshUrl = `${baseURL}${routesName.UserRoute({}).refreshToken}`;
-          const response = await axios.post(refreshUrl, { refreshToken: refreshToken });
+          // Use named refresh route if available, otherwise fall back to /users/refresh
+          const userRoutes = routesName.UserRoute({});
+          const refreshPath = userRoutes.refreshToken || '/users/refresh';
+          const refreshUrl = `${baseURL}${refreshPath}`;
+          const response = await axios.post(refreshUrl, { refreshToken });
           if (response.status === 200) {
-            const token = response.data.result.jwtToken;
-            const newRefreshToken = response.data.result.refreshToken;
-            
-            // Update cookies only (secure)
-            Cookies.set("token", token, { sameSite: 'Strict' });
-            Cookies.set("refreshToken", newRefreshToken, { sameSite: 'Strict' });
+            const token = response.data.result?.jwtToken || response.data.token;
+            const newRefreshToken = response.data.result?.refreshToken || response.data.refreshToken;
 
-            axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+            // Persist tokens in both cookies and localStorage to support current code paths
+            if (token) {
+              Cookies.set('token', token, { sameSite: 'Strict' });
+              localStorage.setItem('kalleenepal_token', token);
+              axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+            }
+            if (newRefreshToken) {
+              Cookies.set('refreshToken', newRefreshToken, { sameSite: 'Strict' });
+              localStorage.setItem('kalleenepal_refresh_token', newRefreshToken);
+            }
+
             return privateAgent(originalRequest);
           }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (refreshError) {
-          console.error('Token Refresh Error:', refreshError);
-        
+          console.error('Token Refresh Error:', refreshError?.response?.data || refreshError.message || refreshError);
+
           // Check if refresh token failed because user was deleted
           if (refreshError.response?.status === 410) {
-            
             handleDeletedUserIfNeeded(refreshError);
             return Promise.reject(refreshError);
           }

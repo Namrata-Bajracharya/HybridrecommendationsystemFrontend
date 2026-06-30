@@ -3,7 +3,7 @@
    (Auth → Cart → Wishlist → Recommendations) and defines
    page routing via react-router-dom. Includes the global
    AuthModal and Navbar/Footer chrome. */
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'
@@ -19,6 +19,9 @@ import CartPage from './pages/Cart'
 import WishlistPage from './pages/Wishlist'
 import OrdersPage from './pages/Orders'
 import AdminPage from './pages/Admin'
+import LoginPage from './pages/Login'
+import RegisterPage from './pages/Register'
+import UserDashboard from './pages/UserDashboard'
 import Test from './pages/Test'
 import RecommendationDemo from './pages/RecommendationDemo'
 
@@ -40,13 +43,17 @@ export default function App() {
               <main className="mx-auto py-8 min-h-[60vh]">
                 <Routes>
                   <Route path="/" element={<HomePage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/:userid/dashboard" element={<UserDashboard />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/collection" element={<CollectionPage />} />
                   <Route path="/product/:id" element={<ProductDetailPage />} />
                   <Route path="/cart" element={<CartPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
                   <Route path="/orders" element={<OrdersPage />} />
-                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                  <Route path="/admin/dashboard" element={<AdminPage />} />
                   <Route path="/test" element={<Test />} />
                   <Route path="/recommendations-demo" element={<RecommendationDemo />} />
                 </Routes>

@@ -27,12 +27,12 @@ export default function AuthModal() {
   }
 
   /* ── Handle form submission ── */
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault(); setError(''); setSuccess('')
     if (!email.trim() || !password.trim()) return setError('Please fill in all fields')
     if (mode === 'signup' && !name.trim()) return setError('Please enter your name')
 
-    const result = mode === 'signin' ? signin(email.trim(), password) : signup(name.trim(), email.trim(), password)
+    const result = mode === 'signin' ? await signin(email.trim(), password) : await signup(name.trim(), email.trim(), password)
     if (!result.ok) return setError(result.error)
 
     setSuccess(mode === 'signin' ? 'Welcome back!' : 'Account created!')

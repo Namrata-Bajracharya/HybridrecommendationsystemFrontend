@@ -1,6 +1,6 @@
 /* ── ProductForm ──
    Add/edit form for custom products with all attributes. */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getCustomProducts, saveCustomProducts, generateId } from '../../utils/products'
 
 export default function ProductForm({ editProduct, onDone }) {
@@ -12,6 +12,12 @@ export default function ProductForm({ editProduct, onDone }) {
     sizes: editProduct?.sizes ? editProduct.sizes.join(',') : 'XS,S,M,L,XL,XXL',
   })
   const [err, setErr] = useState('')
+  const [categories, setCategories] = useState(['kurtha','saree','lehenga','dupatta','blouse'])
+
+  useEffect(()=>{
+    const adminCats = JSON.parse(localStorage.getItem('admin_categories')||'[]')
+    if(adminCats.length) setCategories(c=>[...adminCats.map(x=>x.slug), ...c])
+  }, [])
 
   const handleSubmit = (e) => {
     e.preventDefault(); setErr('')
@@ -37,7 +43,7 @@ export default function ProductForm({ editProduct, onDone }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <input placeholder="Name" value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} className="col-span-full px-3 py-2 rounded-xl bg-cream text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
         <select value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))} className="px-3 py-2 rounded-xl bg-cream text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
-          {['kurtha','saree','lehenga','dupatta','blouse'].map(c => <option key={c} value={c}>{c}</option>)}</select>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
         <input placeholder="Price (Rs)" type="number" value={f.price} onChange={e => setF(p => ({ ...p, price: e.target.value }))} className="px-3 py-2 rounded-xl bg-cream text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
         <select value={f.occasion} onChange={e => setF(p => ({ ...p, occasion: e.target.value }))} className="px-3 py-2 rounded-xl bg-cream text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
           {['casual','office','festive','party','wedding'].map(c => <option key={c} value={c}>{c}</option>)}</select>

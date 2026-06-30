@@ -4,24 +4,24 @@
 import { getAllProducts } from '../../utils/products'
 import { statusFlow, terminalStatuses } from '../../hooks/useOrders'
 
-const LS_ORDERs = 'kalleenepal_orders'
-const LS_USERs = 'kalleenepal_users'
+const LS_ORDERS = 'kalleenepal_orders'
+const LS_USERS = 'kalleenepal_users'
 
 export default function DashboardTab() {
   const all = getAllProducts()
-  const ordeRs = JSON.parse(localStorage.getItem(LS_ORDERS) || '[]')
-  const useRs = JSON.parse(localStorage.getItem(LS_USERS) || '[]')
+  const orders = JSON.parse(localStorage.getItem(LS_ORDERS) || '[]')
+  const users = JSON.parse(localStorage.getItem(LS_USERS) || '[]')
 
   const today = new Date().toDateString()
-  const todayOrdeRs = orders.filter(o => new Date(o.date).toDateString() === today)
+  const todayOrders = orders.filter(o => new Date(o.date).toDateString() === today)
   const todayRevenue = todayOrders.reduce((s, o) => s + (o.total || 0), 0)
   const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
   const pending = orders.filter(o => !terminalStatuses.includes(o.status || 'Processing') && (o.status || 'Processing') !== 'Delivered').length
   const lowStock = all.filter(p => (p.stock ?? 20) < 5)
 
   const productSales = {}
-  orders.forEach(o => o.items.forEach(item => { productSales[item.id] = (productSales[item.id] || 0) + item.quantity }))
-  const bestSelleRs = Object.entries(productSales).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, qty]) => {
+  orders.forEach(o => (o.items || []).forEach(item => { productSales[item.id] = (productSales[item.id] || 0) + (item.quantity || 0) }))
+  const bestSellers = Object.entries(productSales).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, qty]) => {
     const p = all.find(x => x.id === Number(id))
     return p ? { ...p, qty } : null
   }).filter(Boolean)
@@ -47,7 +47,7 @@ export default function DashboardTab() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <h3 className="text-sm font-medium text-dark mb-3">OrdeRs by Status</h3>
+          <h3 className="text-sm font-medium text-dark mb-3">Orders by Status</h3>
           <div className="grid grid-cols-5 gap-2">
             {[...statusFlow, ...terminalStatuses].map(s => (
               <div key={s} className={`rounded-2xl p-3 text-center ${s === 'Delivered' ? 'bg-green-50' : s === 'Cancelled' ? 'bg-red-50' : s === 'Returned' ? 'bg-purple-50' : s === 'Shipped' ? 'bg-blue-50' : 'bg-amber-50'}`}>

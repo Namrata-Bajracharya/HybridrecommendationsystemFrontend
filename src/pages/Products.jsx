@@ -11,6 +11,8 @@ import ProductCard from '../components/ProductCard'
 import ProductForm from '../components/admin/ProductForm'
 import SizeGuide from '../components/SizeGuide'
 import axios from 'axios'
+import { publicAgent } from '../Requests/AuthRequests'
+import { CategoryAPI, ProductAPI } from '../routes/Routes'
 
 // default fallback while categories load
 const DEFAULT_TABS = ['all', 'kurtha', 'saree', 'lehenga', 'dupatta', 'blouse']
@@ -34,8 +36,7 @@ export default function ProductsPage() {
     const source = axios.CancelToken.source()
     async function loadCategories() {
       try {
-        const base = import.meta.env.VITE_API_BASE || ''
-        const resp = await axios.get(`${base}/category`, { cancelToken: source.token })
+        const resp = await publicAgent.get(CategoryAPI({}).getAll, { cancelToken: source.token })
         if (Array.isArray(resp.data)) {
           const names = resp.data.map(c => (c.name || c.slug)).filter(Boolean)
           setTabs(['all', ...names])
@@ -61,8 +62,7 @@ export default function ProductsPage() {
     const source = axios.CancelToken.source()
     async function loadProducts() {
       try {
-        const base = import.meta.env.VITE_API_BASE || ''
-        const resp = await axios.get(`${base}/product?page=1&per_page=1000`, { cancelToken: source.token })
+        const resp = await publicAgent.get(ProductAPI({ pageNum: 1, RecordPerPage: 1000 }).getAll, { cancelToken: source.token })
         const remote = Array.isArray(resp.data?.data) ? resp.data.data : []
         setAllProducts(remote)
       } catch (err) {

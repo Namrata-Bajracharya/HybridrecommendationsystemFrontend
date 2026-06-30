@@ -3,6 +3,8 @@
    Credentials are stored in localStorage (kalleenepal_users, kalleenepal_session).
    ⚠️ Plain-text password — for demo only; in production use bcrypt/hash. */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { publicAgent, privateAgent } from '../Requests/AuthRequests'
+import { UserAPI } from '../routes/Routes'
 
 const AuthContext = createContext(null)
 
@@ -12,38 +14,67 @@ export function AuthProvider({ children }) {
 
   /* ── On mount: hydrate session from localStorage ── */
   useEffect(() => {
+    const token = localStorage.getItem('kalleenepal_token')
     const stored = localStorage.getItem('kalleenepal_session')
-    if (stored) {
+    if (token && stored) {
       try { setUser(JSON.parse(stored)) } catch { localStorage.removeItem('kalleenepal_session') }
     }
   }, [])
 
-  /* ── signup: add to user registry, log in automatically ── */
-  const signup = useCallback((name, email, password) => {
-    const useRs = JSON.parse(localStorage.getItem('kalleenepal_users') || '[]')
-    if (users.find(u => u.email === email)) return { ok: false, error: 'Email already registered' }
-    const newUser = { id: `u${Date.now()}`, name, email, password }
-    users.push(newUser)
-    localStorage.setItem('kalleenepal_users', JSON.stringify(users))
-    localStorage.setItem('kalleenepal_session', JSON.stringify({ id: newUser.id, name: newUser.name, email: newUser.email }))
-    setUser({ id: newUser.id, name: newUser.name, email: newUser.email })
-    return { ok: true }
-  }, [])
-
   /* ── signin: verify credentials against registry ── */
-  const signin = useCallback((email, password) => {
-    const useRs = JSON.parse(localStorage.getItem('kalleenepal_users') || '[]')
-    const found = users.find(u => u.email === email && u.password === password)
-    if (!found) return { ok: false, error: 'Invalid email or password' }
-    localStorage.setItem('kalleenepal_session', JSON.stringify({ id: found.id, name: found.name, email: found.email }))
-    setUser({ id: found.id, name: found.name, email: found.email })
-    return { ok: true }
+  const signin = useCallback(async (email, password) => {
+    try {
+      // Use publicAgent for login
+      const resp = await publicAgent.post(UserAPI({}).login, { email, password })
+      const token = resp.data?.token
+      const userFromResp = resp.data?.user
+      if (!token) return { ok: false, error: 'Invalid login response' }
+      // persist token where interceptors read it
+      localStorage.setItem('kalleenepal_token', token)
+      // use returned user if provided, otherwise fetch /me as fallback
+      let u = userFromResp
+      if (!u) {
+        const meResp = await privateAgent.get(UserAPI({}).getMe)
+        u = meResp.data
+      }
+      if (u) {
+        localStorage.setItem('kalleenepal_session', JSON.stringify(u))
+        setUser(u)
+      }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err.response?.data?.detail || err.message || 'Login failed' }
+    }
   }, [])
 
-  /* ── signout: clear session, reset user state ── */
-  const signout = useCallback(() => {
+  /* ── signup: add to user registry, log in automatically ── */
+  const signup = useCallback(async (name, email, password) => {
+    try {
+      // Use publicAgent for registration (customers only)
+      const payload = { email, password, first_name: name, last_name: '', phone: '' }
+      await publicAgent.post(UserAPI({}).register, payload)
+      // auto-login after register
+      const result = await signin(email, password)
+      if (result.ok === false) return { ok: false, error: result.error }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err.response?.data?.detail || err.message || 'Registration failed' }
+    }
+  }, [signin])
+
+  /* ── signout: notify backend, clear session, reset user state ── */
+  const signout = useCallback(async () => {
+    try {
+      // ask backend to clear any server-side session/cookies
+      await privateAgent.post(UserAPI({}).logout)
+    } catch (err) {
+      // ignore network/errors — still clear client state
+    }
     localStorage.removeItem('kalleenepal_session')
+    localStorage.removeItem('kalleenepal_token')
     setUser(null)
+    // reload so pages relying on auth state update correctly
+    try { window.location.href = '/login' } catch {}
   }, [])
 
   /* ── requireAuth: open modal in requested mode ──

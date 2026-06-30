@@ -24,6 +24,7 @@ export const routesName = {
   UserRoute({ id, pageNum, RecordPerPage, searchTerm } = {}) {
     return {
       register: `${BASE_API_ROUTE}/users/register`,
+      logout: `${BASE_API_ROUTE}/users/logout`,
       login: `${BASE_API_ROUTE}/users/login`,
       getMe: `${BASE_API_ROUTE}/users/me`,
       updateMe: `${BASE_API_ROUTE}/users/me`,

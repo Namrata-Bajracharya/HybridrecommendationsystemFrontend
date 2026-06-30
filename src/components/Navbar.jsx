@@ -54,12 +54,12 @@ export default function Navbar() {
             <div className="relative">
               <button className="w-8 h-8 rounded-full bg-accent text-cream text-sm font-medium flex items-center justify-center"
                 onClick={() => setDropdown(d => !d)}>
-                {user.name.charAt(0).toUpperCase()}
+                {((user.first_name || user.firstName || user.name || user.email || '')[0] || '?').toString().toUpperCase()}
               </button>
               {dropdown && (
                 <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg py-2 z-50"
                   onMouseLeave={() => setDropdown(false)}>
-                  <p className="px-4 py-1 text-sm text-muted truncate">{user.name}</p>
+                  <p className="px-4 py-1 text-sm text-muted truncate">{user.first_name || user.firstName || user.name || user.email}</p>
                   <hr className="my-1" />
                   <button className="w-full text-left px-4 py-2 text-sm text-dark hover:bg-cream transition"
                     onClick={() => { signout(); setDropdown(false) }}>Sign Out</button>

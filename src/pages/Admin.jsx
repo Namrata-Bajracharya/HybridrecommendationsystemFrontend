@@ -1,9 +1,9 @@
 /* AdminPage
    Clean dashboard shell. Auth-gated, tab-based navigation
    with lazy-loaded tab components. */
-import { useState } from 'react'
-import { useAdminAuth } from '../hooks/useAdminAuth'
-import AdminAuth from '../components/admin/AdminAuth'
+import { useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import NotificationBell from '../components/admin/NotificationBell'
 import DashboardTab from '../components/admin/DashboardTab'
 import ProductsTab from '../components/admin/ProductsTab'
@@ -13,33 +13,32 @@ import InventoryTab from '../components/admin/InventoryTab'
 import CategoriesTab from '../components/admin/CategoriesTab'
 import CustomersTab from '../components/admin/CustomersTab'
 import ReportsTab from '../components/admin/ReportsTab'
+import RightSidebar from '../components/admin/RightSidebar'
 
 const TABS = ['dashboard', 'products', 'orders', 'discounts', 'inventory', 'categories', 'customers', 'reports']
 
 export default function AdminPage() {
-  const { admin, signin, signup, signout } = useAdminAuth()
+  const { user, signout } = useAuth()
+  const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
 
-  const handleAuth = (mode, name, email, password, setError) => {
-    const err = mode === 'signin' ? signin(email, password) : signup(name, email, password)
-    if (err) setError(err)
-  }
-
-  if (!admin) return <AdminAuth onLogin={handleAuth} />
+  useEffect(() => {
+    // if not signed in redirect to global login
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    // if signed in but not admin redirect to user dashboard
+    if (user.role && user.role !== 'admin') {
+      navigate(`/${user.id}/dashboard`)
+    }
+  }, [user])
 
   const tabComponents = { dashboard: DashboardTab, products: ProductsTab, orders: OrdersTab, discounts: DiscountsTab, inventory: InventoryTab, categories: CategoriesTab, customers: CustomersTab, reports: ReportsTab }
   const TabComponent = tabComponents[tab]
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-semibold text-dark">Admin Panel</h1>
-        <div className="flex items-center gap-4 text-sm">
-          <NotificationBell />
-          <span className="text-muted">{admin.name}</span>
-          <button className="text-xs text-accent hover:underline" onClick={signout}>Sign Out</button>
-        </div>
-      </div>
 
       <div className="flex gap-6 border-b border-cream-alt mb-8 overflow-x-auto">
         {TABS.map(k => (
@@ -48,7 +47,12 @@ export default function AdminPage() {
         ))}
       </div>
 
-      <TabComponent />
+      <div className="lg:flex lg:items-start lg:gap-6">
+        <div className="flex-1">
+          <TabComponent />
+        </div>
+        <RightSidebar onProductAdded={() => { /* refresh UI if needed */ }} />
+      </div>
     </div>
   )
 }
