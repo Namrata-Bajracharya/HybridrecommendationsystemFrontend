@@ -146,6 +146,30 @@ export const routesName = {
     };
   },
 
+  // ============ RECOMMENDATION ROUTES ============
+  RecommendationRoute({ userId, productId, topK = 10 } = {}) {
+    return {
+      // Personalized recommendations for user
+      forUser: `${BASE_API_ROUTE}/recommendations/for-user/${userId || "userId"}?top_k=${topK}`,
+      forUserWithExclude: (uid, exclude) => `${BASE_API_ROUTE}/recommendations/for-user/${uid}?top_k=${topK}&exclude_ids=${encodeURIComponent(exclude.join(","))}`,
+      
+      // Similar products to a given product
+      similarProducts: `${BASE_API_ROUTE}/recommendations/similar-products/${productId || "productId"}?top_k=${topK}`,
+      
+      // Recommendations based on cart items
+      cartBased: `${BASE_API_ROUTE}/recommendations/cart-items`,
+      
+      // Recommendations based on product review/rating
+      reviewBased: `${BASE_API_ROUTE}/recommendations/review-based`,
+      
+      // Recommendations from users with similar buying patterns
+      similarUsers: `${BASE_API_ROUTE}/recommendations/similar-users/${userId || "userId"}?top_k=${topK}`,
+      
+      // Clear recommendation cache
+      clearCache: `${BASE_API_ROUTE}/recommendations/clear-cache`,
+    };
+  },
+
   // ============ HEALTHCHECK ROUTES ============
   HealthRoute() {
     return {
@@ -189,6 +213,7 @@ export const ReviewAPI = routesName.ReviewRoute;
 export const PaymentAPI = routesName.PaymentRoute;
 export const WishlistAPI = routesName.WishlistRoute;
 export const AdminAPI = routesName.AdminRoute;
+export const RecommendationAPI = routesName.RecommendationRoute;
 export const HealthAPI = routesName.HealthRoute;
 export const ElasticAPI = routesName.ElasticRoute;
 export const TestAPI = routesName.TestRoute;

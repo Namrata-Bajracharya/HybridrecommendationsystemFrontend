@@ -10,8 +10,10 @@ import { occasionLabels } from '../data/products'
 import ProductCard from '../components/ProductCard'
 import ProductForm from '../components/admin/ProductForm'
 import SizeGuide from '../components/SizeGuide'
+import axios from 'axios'
 
-const tabs = ['all', 'kurtha', 'saree', 'lehenga', 'dupatta', 'blouse']
+// default fallback while categories load
+const DEFAULT_TABS = ['all', 'kurtha', 'saree', 'lehenga', 'dupatta', 'blouse']
 
 export default function ProductsPage() {
   const [searchParams] = useSearchParams()
@@ -25,20 +27,68 @@ export default function ProductsPage() {
   const [sort, setSort] = useState('')
   const [showSizeGuide, setShowSizeGuide] = useState(false)
   const [editProduct, setEditProduct] = useState(null)
+  const [tabs, setTabs] = useState(DEFAULT_TABS)
+
+  // fetch categories from backend on mount
+  useEffect(() => {
+    const source = axios.CancelToken.source()
+    async function loadCategories() {
+      try {
+        const base = import.meta.env.VITE_API_BASE || ''
+        const resp = await axios.get(`${base}/category`, { cancelToken: source.token })
+        if (Array.isArray(resp.data)) {
+          const names = resp.data.map(c => (c.name || c.slug)).filter(Boolean)
+          setTabs(['all', ...names])
+        }
+      } catch (err) {
+        // keep defaults on error
+        console.warn('Failed to load categories, using defaults', err)
+      }
+    }
+    loadCategories()
+    return () => source.cancel()
+  }, [])
 
   useEffect(() => { setOccasion(urlOccasion) }, [urlOccasion])
 
   const q = query.toLowerCase().trim()
 
-  const allProducts = useMemo(() => getAllProducts(), [])
+  const [allProducts, setAllProducts] = useState([])
   const customProducts = useMemo(() => getCustomProducts(), [editProduct])
 
+  // fetch products from backend and merge with admin custom products
+  useEffect(() => {
+    const source = axios.CancelToken.source()
+    async function loadProducts() {
+      try {
+        const base = import.meta.env.VITE_API_BASE || ''
+        const resp = await axios.get(`${base}/product?page=1&per_page=1000`, { cancelToken: source.token })
+        const remote = Array.isArray(resp.data?.data) ? resp.data.data : []
+        setAllProducts(remote)
+      } catch (err) {
+        console.warn('Failed to load products from API, falling back to static', err)
+        setAllProducts(getAllProducts())
+      }
+    }
+    loadProducts()
+    return () => source.cancel()
+  }, [editProduct])
+
+  const mergedProducts = useMemo(() => {
+    const map = new Map()
+    allProducts.forEach(p => map.set(p.id, p))
+    customProducts.forEach(p => map.set(p.id, p))
+    return [...map.values()]
+  }, [allProducts, customProducts])
+
   const filtered = useMemo(() => {
-    let result = allProducts.filter(p => {
-      if (category !== 'all' && p.category !== category) return false
+    let result = mergedProducts.filter(p => {
+      // support both static string category and backend object {id,name,slug}
+      const catName = typeof p.category === 'string' ? p.category : (p.category?.name || p.category?.slug)
+      if (category !== 'all' && catName !== category) return false
       if (occasion && p.occasion !== occasion) return false
       if (q) {
-        const searchable = `${p.name} ${p.category} ${p.fabric} ${p.pattern} ${p.region} ${p.occasion} ${p.color}`.toLowerCase()
+        const searchable = `${p.name} ${catName || ''} ${p.fabric} ${p.pattern} ${p.region} ${p.occasion} ${p.color}`.toLowerCase()
         if (!searchable.includes(q)) return false
       }
       return true

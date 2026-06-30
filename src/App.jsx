@@ -20,6 +20,7 @@ import WishlistPage from './pages/Wishlist'
 import OrdersPage from './pages/Orders'
 import AdminPage from './pages/Admin'
 import Test from './pages/Test'
+import RecommendationDemo from './pages/RecommendationDemo'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
                   <Route path="/orders" element={<OrdersPage />} />
                   <Route path="/admin" element={<AdminPage />} />
                   <Route path="/test" element={<Test />} />
+                  <Route path="/recommendations-demo" element={<RecommendationDemo />} />
                 </Routes>
               </main>
 
