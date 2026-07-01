@@ -15,7 +15,7 @@ import CustomersTab from '../components/admin/CustomersTab'
 import ReportsTab from '../components/admin/ReportsTab'
 import RightSidebar from '../components/admin/RightSidebar'
 
-const TABS = ['dashboard', 'products', 'orders', 'discounts', 'inventory', 'categories', 'customers', 'reports']
+const TABS = ['dashboard', 'categories', 'products', 'orders', 'discounts', 'inventory', 'customers', 'reports']
 
 export default function AdminPage() {
   const { user, signout } = useAuth()
@@ -34,7 +34,7 @@ export default function AdminPage() {
     }
   }, [user])
 
-  const tabComponents = { dashboard: DashboardTab, products: ProductsTab, orders: OrdersTab, discounts: DiscountsTab, inventory: InventoryTab, categories: CategoriesTab, customers: CustomersTab, reports: ReportsTab }
+  const tabComponents = { dashboard: DashboardTab, categories: CategoriesTab, products: ProductsTab, orders: OrdersTab, discounts: DiscountsTab, inventory: InventoryTab, customers: CustomersTab, reports: ReportsTab }
   const TabComponent = tabComponents[tab]
 
   return (

@@ -4,7 +4,7 @@
    page routing via react-router-dom. Includes the global
    AuthModal and Navbar/Footer chrome. */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import { WishlistProvider } from './context/WishlistContext'
 import { RecommendationProvider } from './context/RecommendationContext'
@@ -25,6 +25,25 @@ import UserDashboard from './pages/UserDashboard'
 import Test from './pages/Test'
 import RecommendationDemo from './pages/RecommendationDemo'
 
+function GuestRoute({ children }) {
+  const { user } = useAuth()
+  if (user) return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : `/${user.id}/dashboard`} replace />
+  return children
+}
+
+function ProtectedRoute({ children }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+function AdminRoute({ children }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'admin') return <Navigate to="/" replace />
+  return children
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -43,17 +62,17 @@ export default function App() {
               <main className="mx-auto py-8 min-h-[60vh]">
                 <Routes>
                   <Route path="/" element={<HomePage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/:userid/dashboard" element={<UserDashboard />} />
+                  <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+                  <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/collection" element={<CollectionPage />} />
                   <Route path="/product/:id" element={<ProductDetailPage />} />
-                  <Route path="/cart" element={<CartPage />} />
-                  <Route path="/wishlist" element={<WishlistPage />} />
-                  <Route path="/orders" element={<OrdersPage />} />
-                  <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-                  <Route path="/admin/dashboard" element={<AdminPage />} />
+                  <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+                  <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
+                  <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+                  <Route path="/:userid/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
+                  <Route path="/admin" element={<AdminRoute><Navigate to="/admin/dashboard" replace /></AdminRoute>} />
+                  <Route path="/admin/dashboard" element={<AdminRoute><AdminPage /></AdminRoute>} />
                   <Route path="/test" element={<Test />} />
                   <Route path="/recommendations-demo" element={<RecommendationDemo />} />
                 </Routes>

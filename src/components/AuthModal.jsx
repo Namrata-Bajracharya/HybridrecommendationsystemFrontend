@@ -4,10 +4,12 @@
    a protected action (wishlist, order placement). 
    Overlay has backdrop blur; modal is centered. */
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function AuthModal() {
   const { authModal, setAuthModal, signin, signup, user } = useAuth()
+  const navigate = useNavigate()
   const [mode, setMode] = useState(authModal.mode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -35,8 +37,13 @@ export default function AuthModal() {
     const result = mode === 'signin' ? await signin(email.trim(), password) : await signup(name.trim(), email.trim(), password)
     if (!result.ok) return setError(result.error)
 
-    setSuccess(mode === 'signin' ? 'Welcome back!' : 'Account created!')
-    setTimeout(close, 600)
+    const sess = localStorage.getItem('kalleenepal_session')
+    let u = null
+    try { u = JSON.parse(sess) } catch {}
+    if (u?.role === 'admin') navigate('/admin/dashboard')
+    else if (u?.id) navigate(`/${u.id}/dashboard`)
+    else navigate('/')
+    close()
   }
 
   return (

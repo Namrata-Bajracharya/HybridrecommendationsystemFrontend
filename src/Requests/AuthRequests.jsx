@@ -65,37 +65,50 @@ privateAgent.interceptors.response.use(
         if (!refreshToken) return Promise.reject(error);
 
         try {
-          // Use named refresh route if available, otherwise fall back to /users/refresh
           const userRoutes = routesName.UserRoute({});
-          const refreshPath = userRoutes.refreshToken || '/users/refresh';
-          const refreshUrl = `${baseURL}${refreshPath}`;
-          const response = await axios.post(refreshUrl, { refreshToken });
+          const refreshUrl = userRoutes.refreshToken || `${baseURL}/users/refresh`;
+          const response = await axios.post(refreshUrl, { refresh_token: refreshToken });
           if (response.status === 200) {
             const token = response.data.result?.jwtToken || response.data.token;
-            const newRefreshToken = response.data.result?.refreshToken || response.data.refreshToken;
+            const newRefreshToken = response.data.result?.refreshToken || response.data.refreshToken || response.data.refresh_token;
 
-            // Persist tokens in both cookies and localStorage to support current code paths
             if (token) {
               Cookies.set('token', token, { sameSite: 'Strict' });
               localStorage.setItem('kalleenepal_token', token);
-              axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
             }
             if (newRefreshToken) {
               Cookies.set('refreshToken', newRefreshToken, { sameSite: 'Strict' });
               localStorage.setItem('kalleenepal_refresh_token', newRefreshToken);
             }
 
-            return privateAgent(originalRequest);
+            // Retry with fresh config to avoid stale interceptor state
+            return privateAgent({
+              method: originalRequest.method,
+              url: originalRequest.url,
+              data: originalRequest.data,
+              params: originalRequest.params,
+              headers: {
+                Authorization: 'Bearer ' + token,
+              },
+            });
           }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (refreshError) {
           console.error('Token Refresh Error:', refreshError?.response?.data || refreshError.message || refreshError);
 
-          // Check if refresh token failed because user was deleted
           if (refreshError.response?.status === 410) {
             handleDeletedUserIfNeeded(refreshError);
             return Promise.reject(refreshError);
           }
+
+          // Force logout on refresh failure (expired or invalid refresh token)
+          Cookies.remove('token');
+          Cookies.remove('refreshToken');
+          localStorage.removeItem('kalleenepal_token');
+          localStorage.removeItem('kalleenepal_refresh_token');
+          localStorage.removeItem('kalleenepal_session');
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
         }
       }
     }

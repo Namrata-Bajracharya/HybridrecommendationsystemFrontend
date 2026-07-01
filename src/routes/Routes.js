@@ -33,6 +33,18 @@ export const routesName = {
       getAddresses: `${BASE_API_ROUTE}/users/me/addresses`,
       updateAddress: id ? `${BASE_API_ROUTE}/users/me/address/${id}` : `${BASE_API_ROUTE}/users/me/address`,
       deleteAddress: id ? `${BASE_API_ROUTE}/users/me/address/${id}` : `${BASE_API_ROUTE}/users/me/address`,
+      refreshToken: `${BASE_API_ROUTE}/users/refresh`,
+    };
+  },
+
+  // ============ COLLECTION ROUTES ============
+  CollectionRoute({ id, slug } = {}) {
+    return {
+      create: `${BASE_API_ROUTE}/collection`,
+      getAll: `${BASE_API_ROUTE}/collection`,
+      getBySlug: slug ? `${BASE_API_ROUTE}/collection/${slug}` : `${BASE_API_ROUTE}/collection`,
+      update: id ? `${BASE_API_ROUTE}/collection/${id}` : `${BASE_API_ROUTE}/collection`,
+      delete: id ? `${BASE_API_ROUTE}/collection/${id}` : `${BASE_API_ROUTE}/collection`,
     };
   },
 
@@ -41,6 +53,7 @@ export const routesName = {
     return {
       create: `${BASE_API_ROUTE}/category`,
       getAll: `${BASE_API_ROUTE}/category`,
+      getTree: `${BASE_API_ROUTE}/category/tree`,
       getById: id ? `${BASE_API_ROUTE}/category/${id}` : `${BASE_API_ROUTE}/category`,
       getBySlug: `${BASE_API_ROUTE}/category/${searchTerm || "slug"}`,
       update: id ? `${BASE_API_ROUTE}/category/${id}` : `${BASE_API_ROUTE}/category`,
@@ -206,6 +219,7 @@ export const routesName = {
 
 // Export individual route functions for convenience
 export const UserAPI = routesName.UserRoute;
+export const CollectionAPI = routesName.CollectionRoute;
 export const CategoryAPI = routesName.CategoryRoute;
 export const ProductAPI = routesName.ProductRoute;
 export const CartAPI = routesName.CartRoute;
