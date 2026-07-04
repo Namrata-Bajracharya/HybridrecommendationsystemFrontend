@@ -1,10 +1,9 @@
 /* ── OrdersPage ──
-   Displays past ordeRs from localStorage (kalleenepal_orders).
-   Auth-gated — if not signed in, prompts sign-in. */
+    Displays past ordeRs from localStorage (kalleenepal_orders).
+    Auth-gated — if not signed in, prompts sign-in. */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getAllProducts } from '../utils/products'
 
 export default function OrdersPage() {
   const { user, requireAuth } = useAuth()
@@ -58,14 +57,13 @@ export default function OrdersPage() {
               <span className="font-medium text-dark">Rs {order.total.toLocaleString()}</span>
             </div>
             <div className="flex flex-wrap gap-3">
-              {order.items.map(item => {
-                const p = getAllProducts().find(pr => pr.id === item.id)
+              {order.items.map((item, i) => {
+                const pid = item.productId || item.id
                 return (
-                  <Link key={item.ckey} to={`/product/${item.id}`}
+                  <Link key={item.ckey || pid} to={`/product/${pid}`}
                     className="flex items-center gap-2 bg-cream rounded-xl px-3 py-2 text-sm hover:bg-cream-alt transition">
-                    <span>{p?.emoji || '○'}</span>
+                    <span>○</span>
                     <span className="text-dark truncate max-w-[160px]">{item.name}</span>
-                    {item.size && <span className="text-[10px] text-muted uppercase">({item.size})</span>}
                     <span className="text-muted">×{item.quantity}</span>
                   </Link>
                 )

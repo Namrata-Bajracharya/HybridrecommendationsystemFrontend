@@ -1,9 +1,9 @@
 /* AdminPage
-   Clean dashboard shell. Auth-gated, tab-based navigation
+   Clean dashboard shell. Auth-gated, URL-based tab navigation
    with lazy-loaded tab components. */
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import NotificationBell from '../components/admin/NotificationBell'
 import DashboardTab from '../components/admin/DashboardTab'
 import ProductsTab from '../components/admin/ProductsTab'
@@ -13,28 +13,28 @@ import InventoryTab from '../components/admin/InventoryTab'
 import CategoriesTab from '../components/admin/CategoriesTab'
 import CustomersTab from '../components/admin/CustomersTab'
 import ReportsTab from '../components/admin/ReportsTab'
+import SettingsTab from '../components/admin/SettingsTab'
 import RightSidebar from '../components/admin/RightSidebar'
 
-const TABS = ['dashboard', 'categories', 'products', 'orders', 'discounts', 'inventory', 'customers', 'reports']
+const TABS = ['dashboard', 'categories', 'products', 'orders', 'discounts', 'inventory', 'customers', 'reports', 'settings']
 
 export default function AdminPage() {
-  const { user, signout } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('dashboard')
+  const rawTab = useParams().tab || 'dashboard'
+  const tab = TABS.includes(rawTab) ? rawTab : 'dashboard'
 
   useEffect(() => {
-    // if not signed in redirect to global login
     if (!user) {
       navigate('/login')
       return
     }
-    // if signed in but not admin redirect to user dashboard
     if (user.role && user.role !== 'admin') {
       navigate(`/${user.id}/dashboard`)
     }
   }, [user])
 
-  const tabComponents = { dashboard: DashboardTab, categories: CategoriesTab, products: ProductsTab, orders: OrdersTab, discounts: DiscountsTab, inventory: InventoryTab, customers: CustomersTab, reports: ReportsTab }
+  const tabComponents = { dashboard: DashboardTab, categories: CategoriesTab, products: ProductsTab, orders: OrdersTab, discounts: DiscountsTab, inventory: InventoryTab, customers: CustomersTab, reports: ReportsTab, settings: SettingsTab }
   const TabComponent = tabComponents[tab]
 
   return (
@@ -42,8 +42,10 @@ export default function AdminPage() {
 
       <div className="flex gap-6 border-b border-cream-alt mb-8 overflow-x-auto">
         {TABS.map(k => (
-          <button key={k} className={`pb-2 text-sm capitalize transition border-b-2 shrink-0 ${tab === k ? 'text-dark border-dark font-medium' : 'text-muted border-transparent hover:text-dark'}`}
-            onClick={() => setTab(k)}>{k}</button>
+          <Link key={k} to={`/admin/${k}`}
+            className={`pb-2 text-sm capitalize transition border-b-2 shrink-0 ${tab === k ? 'text-dark border-dark font-medium' : 'text-muted border-transparent hover:text-dark'}`}>
+            {k}
+          </Link>
         ))}
       </div>
 

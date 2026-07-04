@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 
 export default function DraggableUpload({
@@ -6,18 +6,15 @@ export default function DraggableUpload({
   maxFiles = 1,
   label,
   required = false,
+  disabled = false,
 }) {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState("");
 
-  const onDrop = useCallback(
-    (accepted, rejected) => {
+  const addFiles = useCallback(
+    (fileList) => {
       setError("");
-      if (rejected.length > 0) {
-        setError(rejected[0].errors[0]?.message || "Invalid file");
-        return;
-      }
-      const newFiles = accepted.map((f) =>
+      const newFiles = Array.from(fileList).map((f) =>
         Object.assign(f, {
           preview: URL.createObjectURL(f),
           id: Math.random().toString(36).slice(2),
@@ -30,12 +27,47 @@ export default function DraggableUpload({
     [files, maxFiles, onFilesChange],
   );
 
+  const onDrop = useCallback(
+    (accepted, rejected) => {
+      setError("");
+      if (rejected.length > 0) {
+        setError(rejected[0].errors[0]?.message || "Invalid file");
+        return;
+      }
+      addFiles(accepted);
+    },
+    [addFiles],
+  );
+
+  useEffect(() => {
+    if (disabled) return;
+    const handler = (e) => {
+      if (files.length >= maxFiles) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageFiles = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type?.startsWith("image/")) {
+          const blob = item.getAsFile();
+          if (blob) imageFiles.push(blob);
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        addFiles(imageFiles);
+      }
+    };
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [files.length, maxFiles, addFiles, disabled]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"] },
     maxSize: 10 * 1024 * 1024,
     maxFiles: maxFiles - files.length,
-    disabled: files.length >= maxFiles,
+    disabled: disabled || files.length >= maxFiles,
     multiple: maxFiles > 1,
   });
 
@@ -54,15 +86,17 @@ export default function DraggableUpload({
       )}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-4 transition text-center cursor-pointer ${isDragActive ? "border-accent bg-accent/5" : "border-dark/20 hover:border-dark/40"} ${files.length >= maxFiles ? "opacity-40 cursor-not-allowed" : ""}`}
+        className={`border-2 border-dashed rounded-xl p-4 transition text-center ${disabled ? "cursor-not-allowed opacity-30" : "cursor-pointer"} ${isDragActive ? "border-accent bg-accent/5" : "border-dark/20 hover:border-dark/40"} ${files.length >= maxFiles ? "opacity-40 cursor-not-allowed" : ""}`}
       >
         <input {...getInputProps()} />
         <p className="text-xs text-muted">
-          {isDragActive
-            ? "Drop here"
-            : files.length >= maxFiles
-              ? `Max ${maxFiles} file(s)`
-              : "Drag & drop or click"}
+          {disabled
+            ? "Select category first"
+            : isDragActive
+              ? "Drop here"
+              : files.length >= maxFiles
+                ? `Max ${maxFiles} file(s)`
+                : "Drag & drop or click"}
         </p>
       </div>
       {error && <p className="text-xs text-red-400 mt-1">{error}</p>}

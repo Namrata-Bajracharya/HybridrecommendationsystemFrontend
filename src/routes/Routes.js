@@ -34,6 +34,10 @@ export const routesName = {
       updateAddress: id ? `${BASE_API_ROUTE}/users/me/address/${id}` : `${BASE_API_ROUTE}/users/me/address`,
       deleteAddress: id ? `${BASE_API_ROUTE}/users/me/address/${id}` : `${BASE_API_ROUTE}/users/me/address`,
       refreshToken: `${BASE_API_ROUTE}/users/refresh`,
+      verify: `${BASE_API_ROUTE}/users/verify/{token}`,
+      forgotPassword: `${BASE_API_ROUTE}/users/forgot-password`,
+      resetPassword: `${BASE_API_ROUTE}/users/reset-password`,
+      changePassword: `${BASE_API_ROUTE}/users/change-password`,
     };
   },
 
@@ -96,6 +100,13 @@ export const routesName = {
       create: `${BASE_API_ROUTE}/order`,
       getAll: `${BASE_API_ROUTE}/order`,
       getById: id ? `${BASE_API_ROUTE}/order/${id}` : `${BASE_API_ROUTE}/order`,
+      direct: `${BASE_API_ROUTE}/order/direct`,
+      adminAll: `${BASE_API_ROUTE}/order/admin/all`,
+      accept: id ? `${BASE_API_ROUTE}/order/${id}/accept` : `${BASE_API_ROUTE}/order`,
+      cancel: id ? `${BASE_API_ROUTE}/order/${id}/cancel` : `${BASE_API_ROUTE}/order`,
+      advance: id ? `${BASE_API_ROUTE}/order/${id}/advance` : `${BASE_API_ROUTE}/order`,
+      refundRequest: id ? `${BASE_API_ROUTE}/order/${id}/refund-request` : `${BASE_API_ROUTE}/order`,
+      customerCancel: id ? `${BASE_API_ROUTE}/order/${id}/customer-cancel` : `${BASE_API_ROUTE}/order`,
     };
   },
 
@@ -200,6 +211,31 @@ export const routesName = {
     };
   },
 
+  // ============ VARIANT ROUTES ============
+  VariantRoute({ productId, variantId } = {}) {
+    return {
+      list: `${BASE_API_ROUTE}/products/${productId || "productId"}/variants`,
+      bulkCreate: `${BASE_API_ROUTE}/products/${productId || "productId"}/variants`,
+      update: `${BASE_API_ROUTE}/variants/${variantId || "variantId"}`,
+      delete: `${BASE_API_ROUTE}/variants/${variantId || "variantId"}`,
+    };
+  },
+
+  // ============ SETTINGS / SHIPPING ROUTES ============
+  ShippingRoute() {
+    return {
+      getSettings: `${BASE_API_ROUTE}/settings`,
+      calculateShipping: `${BASE_API_ROUTE}/shipping/calculate`,
+    };
+  },
+
+  // ============ NOTIFICATION ROUTES ============
+  NotificationRoute() {
+    return {
+      getAll: `${BASE_API_ROUTE}/admin/notifications/me`,
+    };
+  },
+
   // ============ TEST ROUTES ============
   TestRoute() {
     return {
@@ -231,4 +267,7 @@ export const AdminAPI = routesName.AdminRoute;
 export const RecommendationAPI = routesName.RecommendationRoute;
 export const HealthAPI = routesName.HealthRoute;
 export const ElasticAPI = routesName.ElasticRoute;
+export const VariantAPI = routesName.VariantRoute;
+export const ShippingAPI = routesName.ShippingRoute;
+export const NotificationAPI = routesName.NotificationRoute;
 export const TestAPI = routesName.TestRoute;

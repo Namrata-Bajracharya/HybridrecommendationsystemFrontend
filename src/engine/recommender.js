@@ -145,7 +145,7 @@ function buildCoOccurrence() {
 export function getAlsoBought(productId, limit = 6) {
   const coOccur = buildCoOccurrence()
   const neighboRs = coOccur[productId] || {}
-  const paired = Object.entries(neighbors)
+  const paired = Object.entries(neighboRs)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([id]) => products.find(p => p.id === Number(id)))
@@ -190,7 +190,7 @@ export function getRecommendationsForUser(userId, limit = 8) {
       const coOccur = buildCoOccurrence()
       user.purchases.forEach(pid => {
         const neighboRs = coOccur[pid] || {}
-        score += (neighbors[p.id] || 0) * 0.5
+        score += (neighboRs[p.id] || 0) * 0.5
       })
 
       if (user.likes.includes(p.id)) score += 3

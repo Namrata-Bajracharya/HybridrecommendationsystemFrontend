@@ -9,6 +9,7 @@ import {
   useEffect,
   useCallback,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import Cookies from 'js-cookie';
 import { publicAgent, privateAgent } from "../Requests/AuthRequests";
 import { UserAPI } from "../routes/Routes";
@@ -17,7 +18,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [authModal, setAuthModal] = useState({ open: false, mode: "signin" });
+  const navigate = useNavigate();
 
   /* ── On mount: hydrate session from localStorage ── */
   useEffect(() => {
@@ -70,22 +71,11 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  /* ── signup: add to user registry, log in automatically ── */
+  /* ── signup: register user, send verification email ── */
   const signup = useCallback(
-    async (name, email, password) => {
+    async (email, password) => {
       try {
-        // Use publicAgent for registration (customers only)
-        const payload = {
-          email,
-          password,
-          first_name: name,
-          last_name: "",
-          phone: "",
-        };
-        await publicAgent.post(UserAPI({}).register, payload);
-        // auto-login after register
-        const result = await signin(email, password);
-        if (result.ok === false) return { ok: false, error: result.error };
+        await publicAgent.post(UserAPI({}).register, { email, password });
         return { ok: true };
       } catch (err) {
         return {
@@ -95,7 +85,7 @@ export function AuthProvider({ children }) {
         };
       }
     },
-    [signin],
+    [],
   );
 
   /* ── signout: notify backend, clear session, reset user state ── */
@@ -118,18 +108,17 @@ export function AuthProvider({ children }) {
     } catch {}
   }, []);
 
-  /* ── requireAuth: open modal in requested mode ──
-       If user is already signed in, returns true. Otherwise
-       opens the auth modal and returns false. This lets callers
-       conditionally gate features behind login. */
+  /* ── requireAuth: redirect to /login if not signed in ── */
   const requireAuth = useCallback(
-    (mode = "signin") => {
+    () => {
       if (user) return true;
-      setAuthModal({ open: true, mode });
+      navigate("/login");
       return false;
     },
-    [user],
+    [user, navigate],
   );
+
+  const isProfileComplete = user && user.first_name && user.last_name;
 
   return (
     <AuthContext.Provider
@@ -139,8 +128,7 @@ export function AuthProvider({ children }) {
         signin,
         signout,
         requireAuth,
-        authModal,
-        setAuthModal,
+        isProfileComplete,
       }}
     >
       {children}
