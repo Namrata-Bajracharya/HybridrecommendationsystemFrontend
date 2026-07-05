@@ -13,7 +13,7 @@ export default function CartPage() {
   }
 
   const selectedItems = items.filter(i => selected[`${i.productId}-${i.variantId || ''}`])
-  const selectedTotal = selectedItems.reduce((s, i) => s + i.price * i.quantity, 0)
+  const selectedTotal = selectedItems.reduce((s, i) => s + (i.price || 0) * i.quantity, 0)
 
   const handleBuySelected = () => {
     if (selectedItems.length === 0) return
@@ -47,10 +47,16 @@ export default function CartPage() {
             <div key={key} className="flex items-center gap-4 bg-white rounded-2xl p-4">
               <input type="checkbox" checked={!!selected[key]} onChange={() => toggleSelect(item.productId, item.variantId)}
                 className="w-4 h-4 accent-dark shrink-0" />
-              <div className="w-14 h-14 bg-cream rounded-xl flex items-center justify-center text-xl shrink-0">🛍️</div>
+              <div className="w-14 h-14 bg-cream rounded-xl flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                {item.image ? (
+                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>🛍️</span>
+                )}
+              </div>
               <div className="flex-1 min-w-0">
-                <Link to={`/product/${item.productId}`} className="text-sm font-medium text-dark hover:text-accent transition block truncate">{item.name}</Link>
-                <p className="text-sm text-accent font-semibold mt-0.5">Rs {item.price.toLocaleString()}</p>
+                <Link to={`/product/${item.productId}`} className="text-sm font-medium text-dark hover:text-accent transition block truncate">{item.name || 'Product'}</Link>
+                <p className="text-sm text-accent font-semibold mt-0.5">Rs {item.price?.toLocaleString() ?? '—'}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button className="w-7 h-7 rounded-full text-sm hover:bg-cream transition" onClick={() => updateQuantity(item.productId, -1, item.variantId)}>−</button>

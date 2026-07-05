@@ -27,6 +27,7 @@ import UserDashboard from "./pages/UserDashboard";
 import OrderDetailPage from "./pages/OrderDetail";
 import Test from "./pages/Test";
 import RecommendationDemo from "./pages/RecommendationDemo";
+import TestRecommendation from "./pages/TestRecommendation";
 import VerifyEmail from "./pages/VerifyEmail";
 import ProfileComplete from "./pages/ProfileComplete";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -113,14 +114,7 @@ export default function App() {
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/collections" element={<CollectionPage />} />
                   <Route path="/product/:id" element={<ProductDetailPage />} />
-                  <Route
-                    path="/cart"
-                    element={
-                      <CustomerRoute>
-                        <CartPage />
-                      </CustomerRoute>
-                    }
-                  />
+                  <Route path="/cart" element={<CartPage />} />
                   <Route
                     path="/checkout"
                     element={
@@ -181,6 +175,10 @@ export default function App() {
                   <Route
                     path="/recommendations-demo"
                     element={<RecommendationDemo />}
+                  />
+                  <Route
+                    path="/testrecommendation"
+                    element={<TestRecommendation />}
                   />
                   <Route path="/verify" element={<VerifyEmail />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />

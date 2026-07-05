@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { privateAgent } from '../../Requests/AuthRequests'
-import { AdminAPI } from '../../routes/Routes'
+import { AdminAPI, HOST_URL } from '../../routes/Routes'
 import { useSnackbar } from 'notistack'
 
 export default function WishlistTab() {
@@ -59,7 +59,7 @@ export default function WishlistTab() {
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-2">
                       {w.product_image && (
-                        <img src={w.product_image} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                        <img src={`${HOST_URL}/${w.product_image.replace(/^\//, '')}`} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
                       )}
                       <span className="text-dark text-xs truncate max-w-[200px]">{w.product_name}</span>
                     </div>

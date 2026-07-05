@@ -350,10 +350,12 @@ export default function ProductDetailPage() {
                 disabled={variantStock != null ? variantStock <= 0 : !product.in_stock} onClick={handleAdd}>
                 {added ? '✓ Added to Cart' : (variantStock != null ? (variantStock > 0 ? 'Add to Cart' : 'Out of Stock') : (product.in_stock ? 'Add to Cart' : 'Out of Stock'))}
               </button>
-              <button className="flex-1 py-3 rounded-xl bg-accent text-cream font-medium text-sm hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                disabled={variantStock != null ? variantStock <= 0 : !product.in_stock} onClick={handleBuyNow}>
-                Buy it Now
-              </button>
+              {user && (
+                <button className="flex-1 py-3 rounded-xl bg-accent text-cream font-medium text-sm hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={variantStock != null ? variantStock <= 0 : !product.in_stock} onClick={handleBuyNow}>
+                  Buy it Now
+                </button>
+              )}
             </div>
           )}
         </div>

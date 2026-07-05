@@ -1,12 +1,38 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { getAllProducts } from '../utils/products'
+import { HOST_URL } from '../routes/Routes'
 
 const CartContext = createContext(null)
+
+function productImageUrl(product) {
+  const img = product.images?.[0]?.document
+  return img?.relative_path ? `${HOST_URL}/${img.relative_path}`.replace(/\\/g, '/') : null
+}
+
+function enrichCartItems(cart) {
+  const products = getAllProducts()
+  const lookup = {}
+  products.forEach(p => { lookup[p.id] = p })
+  return cart.map(item => {
+    if (item.name && item.price && item.image) return item
+    const p = lookup[String(item.productId)] || lookup[item.productId] || lookup[item.id]
+    if (!p) return { ...item, name: item.name || 'Product', price: item.price ?? 0, image: null }
+    return {
+      ...item,
+      name: item.name || p.name,
+      price: item.price ?? Number(p.price),
+      variantId: item.variantId ?? null,
+      image: item.image || productImageUrl(p) || null,
+    }
+  })
+}
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
     try {
       const stored = localStorage.getItem('kalleenepal_cart')
-      return stored ? JSON.parse(stored) : []
+      const cart = stored ? JSON.parse(stored) : []
+      return enrichCartItems(cart)
     } catch { return [] }
   })
 
@@ -27,6 +53,7 @@ export function CartProvider({ children }) {
         variantName: variantName || null,
         name: product.name,
         price: Number(overridePrice ?? product.price),
+        image: productImageUrl(product),
         quantity: 1,
       }]
     })
