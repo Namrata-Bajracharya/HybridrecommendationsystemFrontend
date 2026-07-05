@@ -118,8 +118,11 @@ export default function CheckoutPage() {
   const taxRate = settings?.tax_percentage ?? 15
   const vat = Math.round(subtotal * taxRate / 100)
   const shippingCost = shippingResult?.cost ?? 0
-  const discount = couponResult?.valid ? applyDiscount(couponResult.coupon, subtotal) : 0
-  const finalTotal = subtotal + vat + shippingCost - discount
+  const validCoupon = couponResult?.valid ? couponResult.coupon : null
+  const cartDiscount = validCoupon && validCoupon.scope !== 'delivery' ? applyDiscount(validCoupon, subtotal) : 0
+  const deliveryDiscount = validCoupon && validCoupon.scope === 'delivery' ? applyDiscount(validCoupon, shippingCost) : 0
+  const effectiveShipping = Math.max(0, shippingCost - deliveryDiscount)
+  const finalTotal = subtotal + vat + effectiveShipping - cartDiscount
 
   const applyCoupon = () => {
     if (!couponCode.trim()) return
@@ -137,14 +140,15 @@ export default function CheckoutPage() {
     const payload = {
       items: checkoutItems.map(i => ({
         product_id: i.productId || i.id,
+        variant_id: i.variantId || null,
         name: i.name,
         price: i.price,
         quantity: i.quantity,
       })),
       total_amount: finalTotal,
-      shipping_cost: shippingCost,
+      shipping_cost: effectiveShipping,
       tax: vat,
-      discount,
+      discount: cartDiscount,
       contact_name: contact.name,
       contact_phone: contact.phone,
       contact_email: contact.email,
@@ -162,10 +166,11 @@ export default function CheckoutPage() {
           status: backendOrder.status || 'Processing',
           paymentMode: 'cod',
           coupon: couponResult?.valid ? couponResult.coupon.code : null,
-          discount,
+          cartDiscount,
+          deliveryDiscount,
           items: [...checkoutItems],
           total: finalTotal,
-          shipping: shippingCost,
+          shipping: effectiveShipping,
           tax: vat,
           contact: { ...contact },
         })
@@ -198,10 +203,11 @@ export default function CheckoutPage() {
           status: 'Processing',
           paymentMode: 'cod',
           coupon: couponResult?.valid ? couponResult.coupon.code : null,
-          discount,
+          cartDiscount,
+          deliveryDiscount,
           items: [...checkoutItems],
           total: finalTotal,
-          shipping: shippingCost,
+          shipping: effectiveShipping,
           tax: vat,
           contact: { ...contact },
         })
@@ -379,7 +385,7 @@ export default function CheckoutPage() {
                 <div key={idx} className="flex gap-3 text-sm">
                   <div className="w-10 h-10 bg-cream rounded-lg flex items-center justify-center text-sm shrink-0">🛍️</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-dark truncate">{item.name}</p>
+                    <p className="text-dark truncate">{item.name}{item.variantName ? ` — ${item.variantName}` : ''}</p>
                     <p className="text-xs text-muted">Qty: {item.quantity}</p>
                   </div>
                   <p className="text-dark font-medium shrink-0">Rs {(item.price * item.quantity).toLocaleString()}</p>
@@ -396,12 +402,21 @@ export default function CheckoutPage() {
               ) : (
                 <div className="flex justify-between text-muted">
                   <span>Shipping</span>
-                  <span className="text-dark font-medium">{shippingResult ? `Rs ${shippingCost.toLocaleString()}` : '—'}</span>
+                  <span className="text-dark font-medium">
+                    {shippingResult
+                      ? deliveryDiscount > 0
+                        ? <><span className="line-through text-muted/50">Rs {shippingCost.toLocaleString()}</span> Rs {effectiveShipping.toLocaleString()}</>
+                        : `Rs ${shippingCost.toLocaleString()}`
+                      : '—'}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between text-muted"><span>VAT ({taxRate}%)</span><span className="text-dark font-medium">Rs {vat.toLocaleString()}</span></div>
-              {discount > 0 && (
-                <div className="flex justify-between text-green-600"><span>Discount</span><span className="font-medium">−Rs {discount.toLocaleString()}</span></div>
+              {cartDiscount > 0 && (
+                <div className="flex justify-between text-green-600"><span>Cart Discount</span><span className="font-medium">−Rs {cartDiscount.toLocaleString()}</span></div>
+              )}
+              {deliveryDiscount > 0 && (
+                <div className="flex justify-between text-green-600"><span>Delivery Discount</span><span className="font-medium">−Rs {deliveryDiscount.toLocaleString()}</span></div>
               )}
               <hr />
               <div className="flex justify-between text-dark font-semibold text-base"><span>Total</span><span>Rs {finalTotal.toLocaleString()}</span></div>

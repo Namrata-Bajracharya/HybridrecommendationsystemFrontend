@@ -12,7 +12,7 @@ export function CartProvider({ children }) {
 
   useEffect(() => { localStorage.setItem('kalleenepal_cart', JSON.stringify(items)) }, [items])
 
-  const addToCart = useCallback((product, variantId, overridePrice) => {
+  const addToCart = useCallback((product, variantId, overridePrice, variantName) => {
     setItems(prev => {
       const existing = prev.find(i => i.productId === product.id && (i.variantId || null) === (variantId || null))
       if (existing) {
@@ -24,6 +24,7 @@ export function CartProvider({ children }) {
       return [...prev, {
         productId: product.id,
         variantId: variantId || null,
+        variantName: variantName || null,
         name: product.name,
         price: Number(overridePrice ?? product.price),
         quantity: 1,

@@ -11,9 +11,8 @@ export default function ProductCard({ product }) {
 
   const isNew = product.created_at && (Date.now() - new Date(product.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000
 
-  const imgSrc = product.images?.[0]?.document?.relative_path
-    ? HOST_URL + '/upload/' + product.images[0].document.relative_path.replace(/\\/g, '/')
-    : null
+  const img = product.images?.[0]?.document
+  const imgSrc = img?.relative_path ? `${HOST_URL}/${img.relative_path}`.replace(/\\/g, '/') : null
 
   const fv = product.field_values || {}
   const typeVal = Object.entries(fv).find(([k]) => !k.startsWith('origin_') && !k.startsWith('design_') && !k.startsWith('design_pattern_'))
@@ -31,7 +30,7 @@ export default function ProductCard({ product }) {
         {imgSrc ? (
           <img src={imgSrc} alt={product.name} className="w-full h-full object-cover" />
         ) : (
-          <span className="text-5xl text-muted/30">📷</span>
+          <span className="text-6xl">{product.emoji || '📷'}</span>
         )}
       </div>
 

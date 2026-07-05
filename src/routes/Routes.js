@@ -95,13 +95,16 @@ export const routesName = {
   },
 
   // ============ ORDER ROUTES ============
-  OrderRoute({ id } = {}) {
+  OrderRoute({ id, orderNumber } = {}) {
     return {
       create: `${BASE_API_ROUTE}/order`,
       getAll: `${BASE_API_ROUTE}/order`,
       getById: id ? `${BASE_API_ROUTE}/order/${id}` : `${BASE_API_ROUTE}/order`,
+      invoice: id ? `${BASE_API_ROUTE}/order/${id}/invoice` : `${BASE_API_ROUTE}/order/invoice`,
+      byNumber: orderNumber ? `${BASE_API_ROUTE}/order/by-number/${encodeURIComponent(orderNumber)}` : `${BASE_API_ROUTE}/order/by-number`,
       direct: `${BASE_API_ROUTE}/order/direct`,
       adminAll: `${BASE_API_ROUTE}/order/admin/all`,
+      adminById: id ? `${BASE_API_ROUTE}/order/admin/${id}` : `${BASE_API_ROUTE}/order/admin`,
       accept: id ? `${BASE_API_ROUTE}/order/${id}/accept` : `${BASE_API_ROUTE}/order`,
       reject: id ? `${BASE_API_ROUTE}/order/${id}/reject` : `${BASE_API_ROUTE}/order`,
       cancel: id ? `${BASE_API_ROUTE}/order/${id}/cancel` : `${BASE_API_ROUTE}/order`,
@@ -113,6 +116,7 @@ export const routesName = {
       refundInitiatePayment: id ? `${BASE_API_ROUTE}/order/${id}/refund/initiate-payment` : `${BASE_API_ROUTE}/order`,
       refundComplete: id ? `${BASE_API_ROUTE}/order/${id}/refund/complete` : `${BASE_API_ROUTE}/order`,
       customerCancel: id ? `${BASE_API_ROUTE}/order/${id}/customer-cancel` : `${BASE_API_ROUTE}/order`,
+      rejectionReasons: `${BASE_API_ROUTE}/admin/rejection-reasons`,
     };
   },
 
@@ -120,6 +124,7 @@ export const routesName = {
   ReviewRoute({ id, pageNum = 0, RecordPerPage = 100 } = {}) {
     return {
       create: `${BASE_API_ROUTE}/reviews`,
+      getByUser: `${BASE_API_ROUTE}/reviews/user/me`,
       getByProduct: `${BASE_API_ROUTE}/reviews/product/${id || "productId"}?skip=${pageNum}&limit=${RecordPerPage}`,
       getById: `${BASE_API_ROUTE}/reviews/${id || "reviewId"}`,
       update: `${BASE_API_ROUTE}/reviews/${id || "reviewId"}`,
@@ -170,10 +175,21 @@ export const routesName = {
       getReviewsForModeration: `${BASE_API_ROUTE}/admin/reviews?page=${pageNum}&page_size=${RecordPerPage}`,
       approveReview: id ? `${BASE_API_ROUTE}/admin/reviews/${id}/approve` : `${BASE_API_ROUTE}/admin/reviews`,
       rejectReview: id ? `${BASE_API_ROUTE}/admin/reviews/${id}/reject` : `${BASE_API_ROUTE}/admin/reviews`,
+      replyToReview: id ? `${BASE_API_ROUTE}/admin/reviews/${id}/reply` : `${BASE_API_ROUTE}/admin/reviews`,
 
       // Inventory Management
+      getInventory: `${BASE_API_ROUTE}/admin/inventory`,
       getInventoryAlerts: `${BASE_API_ROUTE}/admin/inventory/alerts`,
       updateInventoryBulk: `${BASE_API_ROUTE}/admin/inventory/bulk-update`,
+      restock: `${BASE_API_ROUTE}/admin/inventory/restock`,
+
+      // Wishlist
+      getAllWishlists: `${BASE_API_ROUTE}/admin/wishlist`,
+
+      // Reports
+      getProfitReport: `${BASE_API_ROUTE}/admin/reports/profit?period={period}`,
+      getProductProfitReport: `${BASE_API_ROUTE}/admin/reports/product-profit?period={period}`,
+      getOrdersReport: `${BASE_API_ROUTE}/admin/reports/orders?period={period}`,
     };
   },
 
@@ -236,9 +252,10 @@ export const routesName = {
   },
 
   // ============ NOTIFICATION ROUTES ============
-  NotificationRoute() {
+  NotificationRoute({ id } = {}) {
     return {
       getAll: `${BASE_API_ROUTE}/admin/notifications/me`,
+      markRead: id ? `${BASE_API_ROUTE}/admin/notifications/${id}/read` : `${BASE_API_ROUTE}/admin/notifications`,
     };
   },
 

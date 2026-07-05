@@ -16,7 +16,11 @@ import { useRs } from '../data/users'
 
 const attributeKeys = ['fabric', 'pattern', 'occasion', 'color', 'region', 'work', 'sleeve', 'neckline', 'fit']
 
-const products = getAllProducts()
+const _defaultProducts = getAllProducts()
+
+function useProducts(custom) {
+  return custom || _defaultProducts
+}
 
 function attributeVector(p) {
   const set = new Set()
@@ -55,11 +59,13 @@ function contentSimilarity(a, b) {
 export function getSimilarProducts(productId, {
   limit = 8,
   excludeCategory = false,
+  products: customProducts,
 } = {}) {
-  const target = products.find(p => p.id === productId)
+  const pool = useProducts(customProducts)
+  const target = pool.find(p => p.id === productId)
   if (!target) return []
 
-  const scored = products
+  const scored = pool
     .filter(p => p.id !== productId)
     .filter(p => !excludeCategory || p.category !== target.category)
     .map(p => ({ product: p, score: contentSimilarity(target, p) }))
@@ -84,14 +90,15 @@ const complementaryCategories = {
    Finds items from complementary categories that share
    color / work / region with the target product.
    Falls back to any complementary-category item if none match. */
-export function getCompleteTheLook(productId, limit = 4) {
-  const target = products.find(p => p.id === productId)
+export function getCompleteTheLook(productId, limit = 4, customProducts) {
+  const pool = useProducts(customProducts)
+  const target = pool.find(p => p.id === productId)
   if (!target) return []
 
   const complements = complementaryCategories[target.category] || []
-  if (!complements.length) return getSimilarProducts(productId, { limit })
+  if (!complements.length) return getSimilarProducts(productId, { limit, products: customProducts })
 
-  const candidates = products.filter(p =>
+  const candidates = pool.filter(p =>
     complements.includes(p.category) &&
     (p.color === target.color ||
      p.work === target.work ||
@@ -99,7 +106,7 @@ export function getCompleteTheLook(productId, limit = 4) {
   )
 
   if (candidates.length === 0) {
-    return products
+    return pool
       .filter(p => complements.includes(p.category))
       .slice(0, limit)
   }
@@ -142,18 +149,19 @@ function buildCoOccurrence() {
    Collaborative: returns products most frequently co-purchased.
    Falls back to content-based similar products when
    co-purchase data is sparse (cold-start). */
-export function getAlsoBought(productId, limit = 6) {
+export function getAlsoBought(productId, limit = 6, customProducts) {
+  const pool = useProducts(customProducts)
   const coOccur = buildCoOccurrence()
   const neighboRs = coOccur[productId] || {}
   const paired = Object.entries(neighboRs)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([id]) => products.find(p => p.id === Number(id)))
+    .map(([id]) => pool.find(p => p.id === Number(id)))
     .filter(Boolean)
 
   if (paired.length < limit) {
     const existing = new Set([productId, ...paired.map(p => p.id)])
-    const sim = getSimilarProducts(productId, { limit: limit * 2 })
+    const sim = getSimilarProducts(productId, { limit: limit * 2, products: customProducts })
     sim.forEach(p => {
       if (!existing.has(p.id) && paired.length < limit) {
         paired.push(p)
@@ -172,13 +180,14 @@ export function getAlsoBought(productId, limit = 6) {
    - Co-purchase signal from user's purchase history
    - Explicit likes
    Falls back to trending for unknown useRs */
-export function getRecommendationsForUser(userId, limit = 8) {
+export function getRecommendationsForUser(userId, limit = 8, customProducts) {
+  const pool = useProducts(customProducts)
   const user = useRs.find(u => u.id === userId)
-  if (!user) return getTrending(limit)
+  if (!user) return getTrending(limit, { products: customProducts })
 
   const owned = new Set(user.purchases)
 
-  const scored = products
+  const scored = pool
     .filter(p => !owned.has(p.id))
     .map(p => {
       let score = 0
@@ -205,12 +214,13 @@ export function getRecommendationsForUser(userId, limit = 8) {
 /* ── getTrending(limit, {category}) ──
    Popularity-based: ranks products by rating * reviews (weighted score).
    Optionally scoped to a single category. */
-export function getTrending(limit = 8, { category } = {}) {
-  const pool = category
-    ? products.filter(p => p.category === category)
-    : products
+export function getTrending(limit = 8, { category, products: customProducts } = {}) {
+  const pool = useProducts(customProducts)
+  const filtered = category
+    ? pool.filter(p => p.category === category)
+    : pool
 
-  return [...pool]
+  return [...filtered]
     .sort((a, b) => (b.rating * b.reviews) - (a.rating * a.reviews))
     .slice(0, limit)
 }
@@ -218,8 +228,9 @@ export function getTrending(limit = 8, { category } = {}) {
 /* ── getByOccasion(occasion) ──
    Knowledge-based: filteRs products by occasion type,
    sorted by popularity within that occasion. */
-export function getByOccasion(occasion, { limit = 8, excludeId } = {}) {
-  return products
+export function getByOccasion(occasion, { limit = 8, excludeId, products: customProducts } = {}) {
+  const pool = useProducts(customProducts)
+  return pool
     .filter(p => p.occasion === occasion && p.id !== excludeId)
     .sort((a, b) => (b.rating * b.reviews) - (a.rating * a.reviews))
     .slice(0, limit)
@@ -234,7 +245,9 @@ export function getHybridRecommendations({
   userId = null,
   currentProductId = null,
   limit = 8,
+  products: customProducts,
 } = {}) {
+  const pool = useProducts(customProducts)
   const recs = new Map()
 
   function add(source, weight = 1) {
@@ -244,20 +257,20 @@ export function getHybridRecommendations({
   }
 
   if (currentProductId) {
-    add(getSimilarProducts(currentProductId, { limit: limit * 2 }), 1.5)
-    add(getAlsoBought(currentProductId, limit * 2), 2)
+    add(getSimilarProducts(currentProductId, { limit: limit * 2, products: customProducts }), 1.5)
+    add(getAlsoBought(currentProductId, limit * 2, customProducts), 2)
   }
 
   if (userId) {
-    add(getRecommendationsForUser(userId, limit * 2), 1.5)
+    add(getRecommendationsForUser(userId, limit * 2, customProducts), 1.5)
   }
 
-  add(getTrending(limit * 2), 0.5)
+  add(getTrending(limit * 2, { products: customProducts }), 0.5)
 
   const sorted = [...recs.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([id]) => products.find(p => p.id === id))
+    .map(([id]) => pool.find(p => p.id === id))
     .filter(Boolean)
 
   return sorted

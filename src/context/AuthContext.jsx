@@ -16,22 +16,20 @@ import { UserAPI } from "../routes/Routes";
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const navigate = useNavigate();
-
-  /* ── On mount: hydrate session from localStorage ── */
-  useEffect(() => {
+function initUser() {
+  try {
     const token = localStorage.getItem("kalleenepal_token");
     const stored = localStorage.getItem("kalleenepal_session");
-    if (token && stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem("kalleenepal_session");
-      }
-    }
-  }, []);
+    if (token && stored) return JSON.parse(stored);
+  } catch {
+    localStorage.removeItem("kalleenepal_session");
+  }
+  return null;
+}
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(initUser);
+  const navigate = useNavigate();
 
   /* ── signin: verify credentials against registry ── */
   const signin = useCallback(async (email, password) => {

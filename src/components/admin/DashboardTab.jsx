@@ -1,41 +1,43 @@
-/* ── DashboardTab ──
-   Overview cards, ordeRs by status, best-selling products,
-   low-stock alerts. */
-import { getAllProducts } from '../../utils/products'
-import { statusFlow, terminalStatuses } from '../../hooks/useOrders'
-
-const LS_ORDERS = 'kalleenepal_orders'
-const LS_USERS = 'kalleenepal_users'
+import { useState, useEffect } from 'react'
+import { privateAgent } from '../../Requests/AuthRequests'
+import { AdminAPI } from '../../routes/Routes'
+import { useSnackbar } from 'notistack'
 
 export default function DashboardTab() {
-  const all = getAllProducts()
-  const orders = JSON.parse(localStorage.getItem(LS_ORDERS) || '[]')
-  const users = JSON.parse(localStorage.getItem(LS_USERS) || '[]')
+  const { enqueueSnackbar } = useSnackbar()
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const today = new Date().toDateString()
-  const todayOrders = orders.filter(o => new Date(o.date).toDateString() === today)
-  const todayRevenue = todayOrders.reduce((s, o) => s + (o.total || 0), 0)
-  const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
-  const pending = orders.filter(o => !terminalStatuses.includes(o.status || 'Processing') && (o.status || 'Processing') !== 'Delivered').length
-  const lowStock = all.filter(p => (p.stock ?? 20) < 5)
+  useEffect(() => {
+    privateAgent.get(AdminAPI({}).getDashboard)
+      .then(({ data: res }) => setData(res))
+      .catch(() => enqueueSnackbar('Failed to load dashboard', { variant: 'error' }))
+      .finally(() => setLoading(false))
+  }, [enqueueSnackbar])
 
-  const productSales = {}
-  orders.forEach(o => (o.items || []).forEach(item => { productSales[item.id] = (productSales[item.id] || 0) + (item.quantity || 0) }))
-  const bestSellers = Object.entries(productSales).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, qty]) => {
-    const p = all.find(x => x.id === Number(id))
-    return p ? { ...p, qty } : null
-  }).filter(Boolean)
+  if (loading) return <div className="text-sm text-muted">Loading...</div>
+  if (!data) return <div className="text-sm text-muted">No data available.</div>
+
+  const { sales, users, products, reviews } = data
+
+  const statuses = [
+    { label: 'Pending', value: sales.pending_orders, cls: 'bg-amber-50' },
+    { label: 'Paid', value: sales.paid_orders, cls: 'bg-blue-50' },
+    { label: 'Shipped', value: sales.shipped_orders, cls: 'bg-sky-50' },
+    { label: 'Delivered', value: sales.delivered_orders, cls: 'bg-green-50' },
+    { label: 'Cancelled', value: sales.cancelled_orders, cls: 'bg-red-50' },
+  ]
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: 'Today Orders', value: todayOrders.length, emoji: '📋' },
-          { label: 'Today Revenue', value: `Rs ${todayRevenue.toLocaleString()}`, emoji: '💰' },
-          { label: 'Total Revenue', value: `Rs ${totalRevenue.toLocaleString()}`, emoji: '💵' },
-          { label: 'Pending', value: pending, emoji: '⏳' },
-          { label: 'Products', value: all.length, emoji: '📦' },
-          { label: 'Customers', value: users.length, emoji: '👥' },
+          { label: 'Total Orders', value: sales.total_orders, emoji: '📋' },
+          { label: 'Total Revenue', value: `Rs ${(sales.total_revenue || 0).toLocaleString()}`, emoji: '💰' },
+          { label: 'Revenue (30d)', value: `Rs ${(sales.revenue_last_30_days || 0).toLocaleString()}`, emoji: '📈' },
+          { label: 'Pending', value: sales.pending_orders, emoji: '⏳' },
+          { label: 'Products', value: products.total_products, emoji: '📦' },
+          { label: 'Customers', value: users.total_customers, emoji: '👥' },
         ].map(c => (
           <div key={c.label} className="bg-white rounded-2xl p-4 text-center">
             <div className="text-xl mb-1">{c.emoji}</div>
@@ -49,46 +51,51 @@ export default function DashboardTab() {
         <div>
           <h3 className="text-sm font-medium text-dark mb-3">Orders by Status</h3>
           <div className="grid grid-cols-5 gap-2">
-            {[...statusFlow, ...terminalStatuses].map(s => (
-              <div key={s} className={`rounded-2xl p-3 text-center ${s === 'Delivered' ? 'bg-green-50' : s === 'Cancelled' ? 'bg-red-50' : s === 'Returned' ? 'bg-purple-50' : s === 'Shipped' ? 'bg-blue-50' : 'bg-amber-50'}`}>
-                <p className="text-lg font-semibold text-dark">{orders.filter(o => (o.status || 'Processing') === s).length}</p>
-                <p className="text-[10px] text-muted">{s}</p>
+            {statuses.map(s => (
+              <div key={s.label} className={`rounded-2xl p-3 text-center ${s.cls}`}>
+                <p className="text-lg font-semibold text-dark">{s.value}</p>
+                <p className="text-[10px] text-muted">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
 
         <div>
-          <h3 className="text-sm font-medium text-dark mb-3">Best-Selling Products</h3>
-          {bestSellers.length === 0 ? <p className="text-xs text-muted">No sales yet.</p> : (
-            <div className="space-y-2 text-sm">
-              {bestSellers.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 bg-white rounded-xl px-3 py-2">
-                  <span className="text-muted w-4 text-center text-xs">{i + 1}</span>
-                  <span>{p.emoji}</span>
-                  <span className="flex-1 text-dark truncate">{p.name}</span>
-                  <span className="text-accent font-medium">{p.qty} sold</span>
-                </div>
-              ))}
+          <h3 className="text-sm font-medium text-dark mb-3">Reviews Overview</h3>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white rounded-2xl p-3 text-center">
+              <p className="text-lg font-semibold text-dark">{reviews.total_reviews}</p>
+              <p className="text-[10px] text-muted">Total</p>
             </div>
+            <div className="bg-amber-50 rounded-2xl p-3 text-center">
+              <p className="text-lg font-semibold text-dark">{reviews.pending_reviews}</p>
+              <p className="text-[10px] text-muted">Pending</p>
+            </div>
+            <div className="bg-green-50 rounded-2xl p-3 text-center">
+              <p className="text-lg font-semibold text-dark">{reviews.approved_reviews}</p>
+              <p className="text-[10px] text-muted">Approved</p>
+            </div>
+          </div>
+          {reviews.average_rating != null && (
+            <p className="text-xs text-muted mt-2 text-center">Avg rating: {reviews.average_rating} / 5</p>
           )}
         </div>
       </div>
 
-      {lowStock.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-dark mb-3">Low Stock Alerts</h3>
-          <div className="space-y-2 text-sm">
-            {lowStock.map(p => (
-              <div key={p.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-2.5">
-                <span>{p.emoji}</span>
-                <span className="flex-1 text-dark truncate">{p.name}</span>
-                <span className={`font-medium ${(p.stock ?? 0) === 0 ? 'text-red-500' : 'text-amber-500'}`}>Stock: {p.stock ?? 0}</span>
-              </div>
-            ))}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl p-4 text-center">
+          <p className="text-lg font-semibold text-dark">{users.total_users}</p>
+          <p className="text-[11px] text-muted">Total Users</p>
         </div>
-      )}
+        <div className="bg-white rounded-2xl p-4 text-center">
+          <p className="text-lg font-semibold text-dark">{users.new_users_last_30_days}</p>
+          <p className="text-[11px] text-muted">New Users (30d)</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 text-center">
+          <p className="text-lg font-semibold text-dark">{products.low_stock_count}</p>
+          <p className="text-[11px] text-muted">Low Stock Products</p>
+        </div>
+      </div>
     </div>
   )
 }

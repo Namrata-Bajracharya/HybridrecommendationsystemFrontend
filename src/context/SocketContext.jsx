@@ -16,18 +16,21 @@ export function SocketProvider({ children }) {
     const token = localStorage.getItem("kalleenepal_token");
     if (!token && !user) return;
 
+    let cancelled = false;
     const socket = io(SOCKET_URL, {
       auth: { token: token || "" },
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
+      upgrade: true,
+      rememberUpgrade: true,
     });
 
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
-    socket.on("connect_error", () => setConnected(false));
+    socket.on("connect", () => { if (!cancelled) setConnected(true); });
+    socket.on("disconnect", () => { if (!cancelled) setConnected(false); });
+    socket.on("connect_error", () => { if (!cancelled) setConnected(false); });
 
     socket.on("message", (data) => {
       const type = data?.type;
@@ -39,6 +42,8 @@ export function SocketProvider({ children }) {
     socketRef.current = socket;
 
     return () => {
+      cancelled = true;
+      socket.removeAllListeners();
       socket.close();
       socketRef.current = null;
       setConnected(false);

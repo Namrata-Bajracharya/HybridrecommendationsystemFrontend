@@ -4,10 +4,11 @@ import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useWishlist } from '../context/WishlistContext'
 import { useRecommendations } from '../context/RecommendationContext'
+import { useSocket } from '../context/SocketContext'
 import ProductCard from '../components/ProductCard'
 import axios from 'axios'
 import { publicAgent, privateAgent } from '../Requests/AuthRequests'
-import { ProductAPI, ReviewAPI, OrderAPI, HOST_URL } from '../routes/Routes'
+import { ProductAPI, ReviewAPI, OrderAPI, AdminAPI, HOST_URL } from '../routes/Routes'
 
 export default function ProductDetailPage() {
   const { id } = useParams()
@@ -29,7 +30,9 @@ export default function ProductDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false)
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [reviewError, setReviewError] = useState('')
+  const [replyText, setReplyText] = useState({})
   const [selectedVariant, setSelectedVariant] = useState({})
+  const { connected: socketConnected, on: onSocket } = useSocket()
 
   useEffect(() => {
     const source = axios.CancelToken.source()
@@ -77,6 +80,10 @@ export default function ProductDetailPage() {
   }, [id])
 
   useEffect(() => {
+    setSelectedImage(0)
+  }, [selectedVariant])
+
+  useEffect(() => {
     const source = axios.CancelToken.source()
     async function loadReviews() {
       try {
@@ -94,6 +101,25 @@ export default function ProductDetailPage() {
     loadReviews()
     return () => source.cancel()
   }, [id, reviewSubmitted])
+
+  /* ── Socket: listen for new reviews on this product ── */
+  useEffect(() => {
+    if (!socketConnected) return
+    const unsub1 = onSocket('new_review', (data) => {
+      if (Number(data.product_id) !== Number(id)) return
+      if (reviews.some(r => r.id === data.review_id)) return
+      publicAgent.get(ReviewAPI({ id: data.review_id }).getById)
+        .then(({ data: r }) => { if (r?.id) setReviews(prev => [r, ...prev]) })
+        .catch(() => {})
+    })
+    const unsub2 = onSocket('review_reply', (data) => {
+      if (Number(data.product_id) !== Number(id)) return
+      setReviews(prev => prev.map(r =>
+        r.id === data.review_id ? { ...r, reply: data.reply, replied_at: new Date().toISOString() } : r
+      ))
+    })
+    return () => { unsub1(); unsub2() }
+  }, [socketConnected, onSocket, id, reviews])
 
   useEffect(() => {
     if (!user) return
@@ -115,14 +141,15 @@ export default function ProductDetailPage() {
   }, [user, id])
 
   const handleAdd = () => {
-    addToCart(product, selectedVariantObj?.id, variantPrice)
+    addToCart(product, selectedVariantObj?.id, variantPrice, selectedVariantObj?.name)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
 
   const handleBuyNow = () => {
-    addToCart(product, selectedVariantObj?.id, variantPrice)
-    const item = { productId: product.id, variantId: selectedVariantObj?.id || null, name: product.name, price: Number(variantPrice ?? product.price), quantity: 1 }
+    const vName = selectedVariantObj?.name || null
+    addToCart(product, selectedVariantObj?.id, variantPrice, vName)
+    const item = { productId: product.id, variantId: selectedVariantObj?.id || null, variantName: vName, name: product.name, price: Number(variantPrice ?? product.price), quantity: 1 }
     navigate('/checkout', { state: { items: [item] } })
   }
 
@@ -132,11 +159,14 @@ export default function ProductDetailPage() {
     setSubmittingReview(true)
     setReviewError('')
     try {
-      await privateAgent.post(ReviewAPI({}).create, {
+      const { data: newReview } = await privateAgent.post(ReviewAPI({}).create, {
         product_id: Number(id),
         rating: reviewRating,
         comment: reviewComment || null
       })
+      if (newReview?.id) {
+        setReviews(prev => [newReview, ...prev])
+      }
       setReviewSubmitted(true)
       setReviewComment('')
       setReviewRating(5)
@@ -145,6 +175,17 @@ export default function ProductDetailPage() {
     } finally {
       setSubmittingReview(false)
     }
+  }
+
+  const handleReply = async (reviewId) => {
+    const text = replyText[reviewId]
+    if (!text?.trim()) return
+    try {
+      await privateAgent.patch(AdminAPI({ id: reviewId }).replyToReview, { reply: text })
+      setReplyText(prev => ({ ...prev, [reviewId]: '' }))
+      const updated = reviews.map(r => r.id === reviewId ? { ...r, reply: text, replied_at: new Date().toISOString() } : r)
+      setReviews(updated)
+    } catch { alert('Failed to send reply') }
   }
 
   if (loading) return <p className="text-muted mt-8 px-4">Loading...</p>
@@ -184,22 +225,23 @@ export default function ProductDetailPage() {
     const key = JSON.stringify(variantDims.map(name => ({ name, value: selectedVariant[name] || '' })).sort((a, b) => a.name.localeCompare(b.name)))
     return variantLookup[key] || null
   })()
-  const variantPrice = selectedVariantObj?.price ?? null
+  const variantPrice = selectedVariantObj?.selling_price ?? selectedVariantObj?.price ?? null
   const variantStock = selectedVariantObj?.stock_quantity ?? null
-  const variantImagePath = selectedVariantObj?.image ?? null
+  const variantImageRelPath = selectedVariantObj?.document?.relative_path ?? null
 
   const images = product.images || []
   const imageUrls = images.map(img =>
     img.document?.relative_path
-      ? HOST_URL + '/upload/' + img.document.relative_path.replace(/\\/g, '/')
+      ? `${HOST_URL}/${img.document.relative_path}`.replace(/\\/g, '/')
       : null
   ).filter(Boolean)
-  const variantImageUrl = variantImagePath
-    ? HOST_URL + '/upload/' + variantImagePath.replace(/\\/g, '/')
+  const variantImageUrl = variantImageRelPath
+    ? `${HOST_URL}/${variantImageRelPath}`.replace(/\\/g, '/')
     : null
-  const currentImage = selectedImage === 0 && variantImageUrl
-    ? variantImageUrl
-    : imageUrls[selectedImage] || imageUrls[0] || variantImageUrl || null
+  const allImageUrls = variantImageUrl
+    ? [variantImageUrl, ...imageUrls]
+    : imageUrls
+  const currentImage = allImageUrls[selectedImage] || null
 
   const catName = product.category?.name || product.category?.slug || ''
 
@@ -232,9 +274,9 @@ export default function ProductDetailPage() {
               <span className="text-8xl text-muted/30">📷</span>
             )}
           </div>
-          {imageUrls.length > 1 && (
+          {allImageUrls.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {imageUrls.map((url, i) => (
+              {allImageUrls.map((url, i) => (
                 <button key={i} onClick={() => setSelectedImage(i)}
                   className={`w-20 h-20 rounded-xl overflow-hidden bg-cream flex-shrink-0 border-2 transition ${i === selectedImage ? 'border-dark' : 'border-transparent hover:border-muted/30'}`}>
                   <img src={url} alt="" className="w-full h-full object-cover" />
@@ -279,7 +321,7 @@ export default function ProductDetailPage() {
               <p className="text-sm font-medium text-dark mb-2">{dim}: {selectedVariant[dim] || <span className="text-muted font-normal">Select</span>}</p>
               <div className="flex flex-wrap gap-2">
                 {dimOptions[dim].map(val => (
-                  <button key={val} onClick={() => setSelectedVariant(prev => ({ ...prev, [dim]: val }))}
+                  <button key={val} onClick={() => setSelectedVariant(prev => prev[dim] === val ? { ...prev, [dim]: '' } : { ...prev, [dim]: val })}
                     className={`px-4 py-2 rounded-lg text-sm border transition ${selectedVariant[dim] === val ? 'border-dark bg-dark text-cream' : 'border-muted/30 text-dark hover:border-dark'}`}>
                     {val}
                   </button>
@@ -298,22 +340,22 @@ export default function ProductDetailPage() {
           </div>
 
           {/* ── Wishlist + Add to Cart + Buy it Now ── */}
-          <div className="flex gap-3 mt-auto">
-            <button onClick={() => toggleWishlist(product.id)}
-              className="w-12 h-12 rounded-xl border border-muted/30 flex items-center justify-center text-lg hover:bg-cream transition flex-shrink-0">
-              {isInWishlist(product.id) ? '❤️' : '🤍'}
-            </button>
-            <button className="flex-1 py-3 rounded-xl bg-dark text-cream font-medium text-sm hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={variantStock != null ? variantStock <= 0 : !product.in_stock} onClick={handleAdd}>
-              {added ? '✓ Added to Cart' : (variantStock != null ? (variantStock > 0 ? 'Add to Cart' : 'Out of Stock') : (product.in_stock ? 'Add to Cart' : 'Out of Stock'))}
-            </button>
-            {user && user.role !== 'admin' && (
+          {user?.role !== 'admin' && (
+            <div className="flex gap-3 mt-auto">
+              <button onClick={() => toggleWishlist(product.id)}
+                className="w-12 h-12 rounded-xl border border-muted/30 flex items-center justify-center text-lg hover:bg-cream transition flex-shrink-0">
+                {isInWishlist(product.id) ? '❤️' : '🤍'}
+              </button>
+              <button className="flex-1 py-3 rounded-xl bg-dark text-cream font-medium text-sm hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={variantStock != null ? variantStock <= 0 : !product.in_stock} onClick={handleAdd}>
+                {added ? '✓ Added to Cart' : (variantStock != null ? (variantStock > 0 ? 'Add to Cart' : 'Out of Stock') : (product.in_stock ? 'Add to Cart' : 'Out of Stock'))}
+              </button>
               <button className="flex-1 py-3 rounded-xl bg-accent text-cream font-medium text-sm hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
                 disabled={variantStock != null ? variantStock <= 0 : !product.in_stock} onClick={handleBuyNow}>
                 Buy it Now
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -336,26 +378,60 @@ export default function ProductDetailPage() {
 
         {/* Review list */}
         {reviews.length === 0 ? (
-          <p className="text-sm text-muted">No reviews yet. Be the first to review!</p>
+          <p className="text-sm text-muted">No reviews yet.</p>
         ) : (
           <div className="space-y-4 mb-8">
             {reviews.map(r => (
               <div key={r.id} className="border border-cream-alt rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-dark">User #{r.user_id}</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-dark">{r.user_name || `User #${r.user_id}`}</span>
                   <span className="text-xs text-muted">{new Date(r.created_at).toLocaleDateString()}</span>
                 </div>
-                <div className="text-yellow-500 text-sm mb-2">
+                <div className="text-yellow-500 text-sm mb-1">
                   {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
                 </div>
-                {r.comment && <p className="text-sm text-muted">{r.comment}</p>}
+                {r.comment && <p className="text-sm text-dark mb-2">{r.comment}</p>}
+
+                {/* Facebook-style Admin Reply — nested under the review */}
+                <div className="ml-4 pl-4 border-l-2 border-accent/30">
+                  {/* Existing reply display */}
+                  {r.reply && (
+                    <div className="mb-2">
+                      <div className="flex items-center gap-2 text-xs text-muted mb-0.5">
+                        <span className="font-medium text-accent">Admin</span>
+                        <span>·</span>
+                        <span>Reply</span>
+                        {r.replied_at && <><span>·</span><span>{new Date(r.replied_at).toLocaleDateString()}</span></>}
+                      </div>
+                      <p className="text-sm text-dark">{r.reply}</p>
+                    </div>
+                  )}
+
+                  {/* Admin reply input — always visible for admin */}
+                  {user?.role === 'admin' && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        value={replyText[r.id] || ''}
+                        onChange={e => setReplyText(prev => ({ ...prev, [r.id]: e.target.value }))}
+                        placeholder="Write a reply..."
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-cream text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                      />
+                      <button
+                        onClick={() => handleReply(r.id)}
+                        className="px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-medium hover:opacity-90 transition shrink-0"
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Review Form */}
-        {user ? (
+        {/* Review Form — only for customers who bought the product */}
+        {user && user?.role !== 'admin' ? (
           userReview ? (
             <div className="bg-cream rounded-2xl p-4">
               <p className="text-sm text-muted">You have already reviewed this product.</p>
@@ -364,7 +440,7 @@ export default function ProductDetailPage() {
             <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
               <p className="text-sm text-green-700">Thank you! Your review has been submitted.</p>
             </div>
-          ) : (
+          ) : hasPurchased ? (
             <form onSubmit={handleSubmitReview} className="border border-cream-alt rounded-2xl p-4">
               <h3 className="text-sm font-medium text-dark mb-3">Write a Review</h3>
 
@@ -388,8 +464,12 @@ export default function ProductDetailPage() {
                 {submittingReview ? 'Submitting…' : 'Submit Review'}
               </button>
             </form>
+          ) : (
+            <div className="border border-cream-alt rounded-2xl p-4">
+              <p className="text-sm text-muted">You can only review products you have purchased.</p>
+            </div>
           )
-        ) : (
+        ) : user ? null : (
           <div className="border border-cream-alt rounded-2xl p-4">
             <p className="text-sm text-muted">
               <Link to="/login" className="text-accent hover:underline">Sign in</Link> to write a review.

@@ -1,5 +1,5 @@
 /* ── DiscountsTab ──
-   Lists coupon codes with create/delete actions.
+   Lists coupon codes (cart & delivery) with create/delete actions.
    Includes inline CouponForm. */
 import { useState } from 'react'
 import { getCoupons, saveCoupons } from '../../utils/coupons'
@@ -23,7 +23,14 @@ export default function DiscountsTab() {
           {coupons.map(c => (
             <div key={c.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-2.5">
               <span className="font-mono font-semibold text-dark uppercase">{c.code}</span>
-              <span className="text-muted text-xs">{c.type === 'percent' ? `${c.value}% off` : `Rs ${c.value} off`}</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${c.scope === 'delivery' ? 'bg-blue-50 text-blue-600' : 'bg-cream text-muted'}`}>
+                {c.scope === 'delivery' ? 'Delivery' : 'Cart'}
+              </span>
+              <span className="text-muted text-xs">
+                {c.scope === 'delivery' && c.type === 'free' ? 'Free delivery'
+                  : c.type === 'percent' ? `${c.value}% off`
+                  : `Rs ${c.value} off`}
+              </span>
               {c.minPurchase > 0 && <span className="text-muted text-xs">min Rs {c.minPurchase}</span>}
               <span className="text-muted text-xs">Used: {c.usedCount || 0}{c.usageLimit ? `/${c.usageLimit}` : ''}</span>
               <button className="ml-auto text-xs text-red-400 hover:text-red-500"

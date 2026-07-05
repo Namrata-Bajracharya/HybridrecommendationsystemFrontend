@@ -1,13 +1,15 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useOrders, statusFlow, terminalStatuses } from '../hooks/useOrders'
 import { getAllProducts } from '../utils/products'
 import ProductCard from '../components/ProductCard'
 import { privateAgent } from '../Requests/AuthRequests'
-import { OrderAPI } from '../routes/Routes'
+import { OrderAPI, ReviewAPI } from '../routes/Routes'
+import { useSocket } from '../context/SocketContext'
+import InvoiceModal from '../components/InvoiceModal'
 
-const CUSTOMER_TABS = ['dashboard', 'orders', 'wishlist']
+const CUSTOMER_TABS = ['dashboard', 'orders', 'wishlist', 'reviews']
 
 const REFUND_REASONS = [
   { value: 'item_damaged', label: 'Item Damaged' },
@@ -31,24 +33,35 @@ function CustomerDashboardTab() {
   const { user } = useAuth()
   const { orders: localOrders } = useOrders()
   const [backendOrders, setBackendOrders] = useState([])
+  const { connected, on } = useSocket()
   const all = getAllProducts()
 
-  useEffect(() => {
+  const fetchOrders = useCallback(() => {
     if (!user) return
     privateAgent.get(OrderAPI({}).getAll)
       .then(r => setBackendOrders(r.data || []))
       .catch(() => {})
   }, [user])
 
+  useEffect(() => { fetchOrders() }, [fetchOrders])
+
+  useEffect(() => {
+    if (!connected) return
+    const unsub1 = on("order_placed", fetchOrders)
+    const unsub2 = on("order_status", fetchOrders)
+    return () => { unsub1(); unsub2() }
+  }, [connected, on, fetchOrders])
+
   const local = localOrders.filter(o => o.contact?.email === user?.email)
-  const backend = backendOrders.filter(o => o.contact_email === user?.email)
+  const backend = backendOrders
   const myOrders = [...backend, ...local]
 
   const today = new Date().toDateString()
   const todayOrders = myOrders.filter(o => new Date(o.order_date || o.date).toDateString() === today)
   const todayRevenue = todayOrders.reduce((s, o) => s + (o.total_amount || o.total || 0), 0)
   const totalRevenue = myOrders.reduce((s, o) => s + (o.total_amount || o.total || 0), 0)
-  const pending = myOrders.filter(o => !terminalStatuses.includes(o.status || 'Processing') && (o.status || 'Processing') !== 'Delivered').length
+  const pendingStatuses = ['pending', 'accepted', 'packed', 'on_delivery', 'Processing', 'Shipped']
+  const pending = myOrders.filter(o => pendingStatuses.includes(o.status || 'Processing')).length
   const wishlistCount = JSON.parse(localStorage.getItem('kalleenepal_wishlist') || '[]').length
 
   return (
@@ -239,22 +252,32 @@ function RefundModal({ orderId, onClose, onConfirm }) {
 function CustomerOrdersTab() {
   const { user } = useAuth()
   const { orders: localOrders } = useOrders()
+  const navigate2 = useNavigate()
   const [backendOrders, setBackendOrders] = useState([])
   const [filter, setFilter] = useState('all')
   const [cancelOrderId, setCancelOrderId] = useState(null)
   const [refundOrderId, setRefundOrderId] = useState(null)
+  const [invoiceOrderId, setInvoiceOrderId] = useState(null)
+  const { connected, on } = useSocket()
 
-  const fetchMyOrders = () => {
+  const fetchMyOrders = useCallback(() => {
     if (!user) return
     privateAgent.get(OrderAPI({}).getAll)
       .then(r => setBackendOrders(r.data || []))
       .catch(() => {})
-  }
+  }, [user])
 
-  useEffect(() => { fetchMyOrders() }, [user])
+  useEffect(() => { fetchMyOrders() }, [fetchMyOrders])
+
+  useEffect(() => {
+    if (!connected) return
+    const unsub1 = on("order_placed", fetchMyOrders)
+    const unsub2 = on("order_status", fetchMyOrders)
+    return () => { unsub1(); unsub2() }
+  }, [connected, on, fetchMyOrders])
 
   const allLocal = localOrders.filter(o => o.contact?.email === user?.email)
-  const allBackend = backendOrders.filter(o => o.contact_email === user?.email)
+  const allBackend = backendOrders
   const allOrders = [...allBackend, ...allLocal]
   const seen = new Set()
   const merged = allOrders.filter(o => {
@@ -307,13 +330,14 @@ function CustomerOrdersTab() {
       {filtered.length === 0 ? <p className="text-muted text-sm">No orders found.</p> : (
         <div className="space-y-3">
           {[...filtered].reverse().map(o => {
+
             const status = o.status || 'Processing'
             const items = o.order_items || o.items || []
             const label = STATUS_LABELS_CUSTOMER[status] || status
             const refundIdx = refundProgressIndex(status)
             const refundProofs = (() => { try { return JSON.parse(o.refund_proof_images || '[]') } catch { return [] } })()
             return (
-              <div key={o.id || o.order_number} className="bg-white rounded-2xl p-4">
+              <div key={o.id || o.order_number} className="bg-white rounded-2xl p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate2(`/orders/${o.id}`)}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="text-xs text-muted">
                     <p className="font-medium text-dark text-sm mb-0.5">Order #{o.order_number || o.id}</p>
@@ -337,6 +361,9 @@ function CustomerOrdersTab() {
                     <div className="mt-1.5 space-x-2">
                       {status === 'pending' && (
                         <button className="text-red-400 hover:text-red-500 text-[11px]" onClick={() => setCancelOrderId(o.id)}>Cancel</button>
+                      )}
+                      {status === 'delivered' && (
+                        <button className="text-accent hover:text-accent/80 text-[11px] font-medium" onClick={() => setInvoiceOrderId(o.id)}>Invoice</button>
                       )}
                       {canRequestRefund(o) && (
                         <button className="text-purple-400 hover:text-purple-500 text-[11px]" onClick={() => setRefundOrderId(o.id)}>Request Refund</button>
@@ -383,6 +410,7 @@ function CustomerOrdersTab() {
       )}
       {cancelOrderId && <CustomerCancelModal orderId={cancelOrderId} onClose={() => setCancelOrderId(null)} onConfirm={(reason) => handleCustomerCancel(cancelOrderId, reason)} />}
       {refundOrderId && <RefundModal orderId={refundOrderId} onClose={() => setRefundOrderId(null)} onConfirm={(reason, description, proofImages) => handleRefundRequest(refundOrderId, reason, description, proofImages)} />}
+      {invoiceOrderId && <InvoiceModal orderId={invoiceOrderId} onClose={() => setInvoiceOrderId(null)} />}
     </div>
   )
 }
@@ -411,6 +439,78 @@ function CustomerWishlistTab() {
   )
 }
 
+function CustomerReviewsTab() {
+  const { user } = useAuth()
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const allProducts = getAllProducts()
+
+  useEffect(() => {
+    if (!user) return
+    setLoading(true)
+    privateAgent.get(ReviewAPI({}).getByUser)
+      .then(({ data }) => setReviews(Array.isArray(data) ? data : []))
+      .catch(() => setReviews([]))
+      .finally(() => setLoading(false))
+  }, [user])
+
+  if (loading) return <p className="text-sm text-muted">Loading...</p>
+
+  if (reviews.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-4xl mb-3">✍️</div>
+        <h2 className="text-lg font-semibold text-dark mb-1">No reviews yet</h2>
+        <p className="text-muted text-sm mb-4">Reviews you write will appear here.</p>
+        <Link to="/products" className="inline-block px-5 py-2 rounded-xl bg-dark text-cream text-sm font-medium hover:opacity-90 transition">
+          Browse Products
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {reviews.map(r => {
+        const product = allProducts.find(p => p.id === r.product_id)
+        const productName = product?.name || r.product_name || `Product #${r.product_id}`
+        return (
+          <Link key={r.id} to={`/product/${r.product_id}`}
+            className="block bg-white rounded-2xl p-4 hover:shadow-md transition-shadow border border-transparent hover:border-cream-alt">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-xl bg-cream overflow-hidden shrink-0 flex items-center justify-center text-lg">
+                {product?.images?.[0]?.document?.relative_path
+                  ? <img src={`http://localhost:8000/${product.images[0].document.relative_path}`.replace(/\\/g, '/')} alt="" className="w-full h-full object-cover" />
+                  : product?.emoji || '📦'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-dark">{productName}</p>
+                <div className="text-yellow-500 text-sm my-1">
+                  {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                </div>
+                {r.comment && <p className="text-sm text-muted">{r.comment}</p>}
+                <p className="text-[11px] text-muted/50 mt-1">{new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+
+                {r.reply && (
+                  <div className="mt-3 ml-4 pl-4 border-l-2 border-accent/30">
+                    <div className="flex items-center gap-2 text-xs text-muted mb-0.5">
+                      <span className="font-medium text-accent">Admin</span>
+                      <span>·</span>
+                      <span>Reply</span>
+                      {r.replied_at && <><span>·</span><span>{new Date(r.replied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>}
+                    </div>
+                    <p className="text-sm text-dark">{r.reply}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function UserDashboard() {
   const { user } = useAuth()
   const params = useParams()
@@ -426,7 +526,7 @@ export default function UserDashboard() {
 
   if (!user) return null
 
-  const tabComponents = { dashboard: CustomerDashboardTab, orders: CustomerOrdersTab, wishlist: CustomerWishlistTab }
+  const tabComponents = { dashboard: CustomerDashboardTab, orders: CustomerOrdersTab, wishlist: CustomerWishlistTab, reviews: CustomerReviewsTab }
   const TabComponent = tabComponents[tab]
 
   return (

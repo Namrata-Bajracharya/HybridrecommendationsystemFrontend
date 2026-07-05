@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { privateAgent } from '../../Requests/AuthRequests'
 import { ProductAPI, HOST_URL } from '../../routes/Routes'
 import ProductForm from './ProductForm'
@@ -8,7 +8,17 @@ export default function ProductsTab() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editProduct, setEditProduct] = useState(null)
+  const formRef = useRef(null)
+
+  useEffect(() => {
+    if ((showForm || editProduct) && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [showForm, editProduct])
   const [viewProduct, setViewProduct] = useState(null)
+  const [viewVariantIdx, setViewVariantIdx] = useState(-1)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const perPage = 20
@@ -26,12 +36,15 @@ export default function ProductsTab() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this product?')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      await privateAgent.delete(ProductAPI({ id }).delete)
+      await privateAgent.delete(ProductAPI({ id: deleteTarget.id }).delete)
+      setDeleteTarget(null)
       fetch()
     } catch { alert('Failed to delete') }
+    finally { setDeleting(false) }
   }
 
   return (
@@ -42,7 +55,9 @@ export default function ProductsTab() {
           onClick={() => { setShowForm(o => !o); setEditProduct(null) }}>{showForm && !editProduct ? 'Cancel' : '+ Add Product'}</button>
       </div>
       {(showForm || editProduct) && (
-        <ProductForm editProduct={editProduct} onDone={() => { setShowForm(false); setEditProduct(null); fetch() }} />
+        <div ref={formRef}>
+          <ProductForm editProduct={editProduct} onDone={() => { setShowForm(false); setEditProduct(null); fetch() }} />
+        </div>
       )}
       {loading ? <p className="text-sm text-muted">Loading...</p> : (
         <>
@@ -64,7 +79,7 @@ export default function ProductsTab() {
                   <div className="flex gap-2 shrink-0">
                     <button className="text-xs text-dark/60 hover:text-dark" onClick={() => setViewProduct(p)}>View</button>
                     <button className="text-xs text-accent hover:underline" onClick={() => { setEditProduct(p); setShowForm(false) }}>Edit</button>
-                    <button className="text-xs text-red-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>Delete</button>
+                    <button className="text-xs text-red-400 hover:text-red-500" onClick={() => setDeleteTarget({ id: p.id, name: p.name })}>Delete</button>
                   </div>
                 </div>
               )
@@ -80,16 +95,28 @@ export default function ProductsTab() {
         </>
       )}
       {viewProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setViewProduct(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setViewProduct(null); setViewVariantIdx(-1) }}>
           <div className="bg-white rounded-2xl max-w-lg w-full mx-4 overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
             {(() => {
-              const img = viewProduct.images?.[0]?.document
-              const imgUrl = img ? `${HOST_URL}/${img.relative_path}`.replace(/\\/g, '/') : null
+              const variants = viewProduct.variants || []
+              const hasVariants = variants.length > 0
+              const selIdx = viewVariantIdx >= 0 && viewVariantIdx < variants.length ? viewVariantIdx : -1
+              const selVariant = selIdx >= 0 ? variants[selIdx] : null
+
+              const productImg = viewProduct.images?.[0]?.document
+              const productImgUrl = productImg ? `${HOST_URL}/${productImg.relative_path}`.replace(/\\/g, '/') : null
+              const variantImg = selVariant?.document
+              const variantImgUrl = variantImg ? `${HOST_URL}/${variantImg.relative_path}`.replace(/\\/g, '/') : null
+              const currentImgUrl = variantImgUrl || productImgUrl
+
+              const currentPrice = selVariant?.selling_price ?? selVariant?.price ?? viewProduct.price
+              const currentStock = selVariant?.stock_quantity ?? viewProduct.stock_quantity
+
               return (
                 <>
-                  {imgUrl && (
+                  {currentImgUrl && (
                     <div className="w-full h-64 bg-cream">
-                      <img src={imgUrl} alt={viewProduct.name} className="w-full h-full object-cover" />
+                      <img src={currentImgUrl} alt={viewProduct.name} className="w-full h-full object-cover" />
                     </div>
                   )}
                   <div className="p-5 space-y-3">
@@ -100,7 +127,7 @@ export default function ProductsTab() {
                           <span className="text-xs text-muted bg-cream px-2 py-0.5 rounded-full">{viewProduct.category.name}</span>
                         )}
                       </div>
-                      <span className="text-xl font-bold text-accent">Rs {viewProduct.price?.toLocaleString()}</span>
+                      <span className="text-xl font-bold text-accent">Rs {Number(currentPrice)?.toLocaleString()}</span>
                     </div>
                     {viewProduct.description && <p className="text-sm text-muted">{viewProduct.description}</p>}
                     {viewProduct.field_values && Object.keys(viewProduct.field_values).length > 0 && (
@@ -111,15 +138,41 @@ export default function ProductsTab() {
                       </div>
                     )}
                     <div className="flex items-center gap-4 text-sm text-muted pt-2 border-t border-dark/5">
-                      <span>Stock: {viewProduct.stock_quantity ?? 0}</span>
+                      <span>Stock: {currentStock ?? 0}</span>
                       {viewProduct.sku && <span>SKU: {viewProduct.sku}</span>}
                     </div>
+                    {hasVariants && (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-dark/5">
+                        {variants.map((v, i) => (
+                          <button key={i} onClick={() => setViewVariantIdx(i === selIdx ? -1 : i)}
+                            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${i === selIdx ? 'bg-dark text-cream' : 'bg-cream text-muted hover:text-dark'}`}>
+                            {v.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <button className="w-full py-2 rounded-xl bg-dark text-cream text-sm font-medium hover:opacity-90 transition"
-                      onClick={() => setViewProduct(null)}>Close</button>
+                      onClick={() => { setViewProduct(null); setViewVariantIdx(-1) }}>Close</button>
                   </div>
                 </>
               )
             })()}
+          </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="bg-white rounded-2xl max-w-sm w-full mx-4 p-6 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-medium text-dark">Delete this product?</p>
+            <p className="text-sm text-muted leading-relaxed">
+              This will permanently remove <span className="text-dark font-medium">{deleteTarget.name}</span> and all its data.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button className="flex-1 py-2 rounded-xl bg-cream text-sm text-dark hover:opacity-80 transition disabled:opacity-40"
+                disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button className="flex-1 py-2 rounded-xl bg-red-500 text-sm text-white font-medium hover:opacity-90 transition disabled:opacity-40"
+                disabled={deleting} onClick={handleDelete}>{deleting ? 'Deleting...' : 'Delete'}</button>
+            </div>
           </div>
         </div>
       )}

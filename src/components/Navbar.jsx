@@ -7,6 +7,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
+import NotificationBell from "./admin/NotificationBell";
 
 export default function Navbar() {
   const { user, signout, requireAuth } = useAuth();
@@ -66,6 +67,9 @@ export default function Navbar() {
 
         {/* ── Right: auth avatar / CTA + cart icon + mobile hamburger ── */}
         <div className="flex items-center gap-4">
+          {/* ── Notification Bell ── */}
+          {user && <NotificationBell />}
+
           {/* ── User avatar or Sign In CTA ── */}
           {user ? (
             <div className="relative">

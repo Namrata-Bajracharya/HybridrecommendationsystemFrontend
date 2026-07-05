@@ -1,6 +1,6 @@
 /* ── Coupon utilities ──
    Coupon codes stored in localStorage (kalleenepal_coupons).
-   Each coupon: { id, code, type: 'percent'|'fixed', value, minPurchase, usageLimit, usedCount } */
+   Each coupon: { id, code, scope: 'cart'|'delivery', type: 'percent'|'fixed'|'free', value, minPurchase, usageLimit, usedCount } */
 const LS_KEY = 'kalleenepal_coupons'
 
 export function getCoupons() {
@@ -25,9 +25,14 @@ export function validateCoupon(code, cartTotal) {
   return { valid: true, coupon: c }
 }
 
-export function applyDiscount(coupon, cartTotal) {
-  if (coupon.type === 'percent') return Math.round(cartTotal * (coupon.value / 100))
-  return Math.min(coupon.value, cartTotal)
+export function applyDiscount(coupon, targetTotal) {
+  if (coupon.scope === 'delivery') {
+    if (coupon.type === 'free') return targetTotal
+    if (coupon.type === 'percent') return Math.round(targetTotal * (coupon.value / 100))
+    return Math.min(coupon.value, targetTotal)
+  }
+  if (coupon.type === 'percent') return Math.round(targetTotal * (coupon.value / 100))
+  return Math.min(coupon.value, targetTotal)
 }
 
 export function incrementCouponUsage(code) {

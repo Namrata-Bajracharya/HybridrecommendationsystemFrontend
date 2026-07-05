@@ -72,11 +72,13 @@ export default function ProductsPage() {
         )
         if (Array.isArray(catResp.data)) {
           const map = {}
-          const names = catResp.data.map(c => {
-            const key = c.name || c.slug
-            map[key] = c.id
-            return key
-          }).filter(Boolean)
+          const names = catResp.data
+            .filter(c => c.parent_id == null)
+            .map(c => {
+              const key = c.name || c.slug
+              map[key] = c.id
+              return key
+            }).filter(Boolean)
           setCategoryMap(map)
           setTabs(['all', ...names])
         }

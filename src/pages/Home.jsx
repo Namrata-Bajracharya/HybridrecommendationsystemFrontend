@@ -100,35 +100,6 @@ export default function HomePage() {
             </div>
           </section>
         )}
-
-        {/* ── Ethos / Values ── */}
-        <section className="bg-cream-alt p-8 sm:p-12 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
-          {[
-            {
-              emoji: "🧵",
-              title: "Handloom & Handcrafted",
-              desc: "Every piece supports traditional artisans across India.",
-            },
-            {
-              emoji: "🌿",
-              title: "Mindfully Sourced",
-              desc: "Natural fabrics, ethical production, minimal waste.",
-            },
-            {
-              emoji: "✨",
-              title: "Curated for You",
-              desc: "Smart recommendations based on your unique taste.",
-            },
-          ].map((item) => (
-            <div key={item.title}>
-              <div className="text-3xl mb-3">{item.emoji}</div>
-              <h3 className="text-sm font-semibold text-dark mb-1">
-                {item.title}
-              </h3>
-              <p className="text-xs text-muted">{item.desc}</p>
-            </div>
-          ))}
-        </section>
       </div>
     </div>
   );

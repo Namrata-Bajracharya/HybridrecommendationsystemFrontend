@@ -12,6 +12,7 @@ import { RecommendationProvider } from "./context/RecommendationContext";
 import { SocketProvider } from "./context/SocketContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import SocketNotifier from "./components/SocketNotifier";
 
 import HomePage from "./pages/Home";
 import ProductsPage from "./pages/Products";
@@ -23,6 +24,7 @@ import AdminPage from "./pages/Admin";
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 import UserDashboard from "./pages/UserDashboard";
+import OrderDetailPage from "./pages/OrderDetail";
 import Test from "./pages/Test";
 import RecommendationDemo from "./pages/RecommendationDemo";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -88,6 +90,7 @@ export default function App() {
               <Navbar />
 
               {/* ── Page content ── */}
+              <SocketNotifier />
               <main className="mx-auto py-8 min-h-[60vh]">
                 <Routes>
                   <Route path="/" element={<HomePage />} />
@@ -143,6 +146,14 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/admin/customers/:customerId"
+                    element={
+                      <AdminRoute>
+                        <AdminPage />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
                     path="/admin/:tab"
                     element={
                       <AdminRoute>
@@ -187,6 +198,14 @@ export default function App() {
                     element={
                       <ProtectedRoute requireProfile={false}>
                         <ProfileComplete />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/orders/:id"
+                    element={
+                      <ProtectedRoute>
+                        <OrderDetailPage />
                       </ProtectedRoute>
                     }
                   />

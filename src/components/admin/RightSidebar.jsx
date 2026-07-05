@@ -1,13 +1,21 @@
+import { useState, useEffect } from 'react'
 import CategoryForm from './CategoryForm'
 import ReviewsAdmin from './ReviewsAdmin'
 import ProductForm from './ProductForm'
+import { privateAgent } from '../../Requests/AuthRequests'
+import { AdminAPI } from '../../routes/Routes'
 
 function UsersCard(){
-  const users = JSON.parse(localStorage.getItem('users')||'[]')
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    privateAgent.get(AdminAPI({}).getDashboard)
+      .then(({ data }) => setCount(data?.users?.total_customers ?? 0))
+      .catch(() => {})
+  }, [])
   return (
     <div className="bg-white rounded-2xl p-4 text-center">
-      <p className="text-xs text-muted">Total users</p>
-      <p className="text-2xl font-semibold text-dark">{users.length}</p>
+      <p className="text-xs text-muted">Total customers</p>
+      <p className="text-2xl font-semibold text-dark">{count}</p>
     </div>
   )
 }

@@ -1,10 +1,9 @@
 /* AdminPage
    Clean dashboard shell. Auth-gated, URL-based tab navigation
-   with lazy-loaded tab components. */
+   with lazy-loaded tab components. Supports /admin/customers/:id detail view. */
 import { useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import NotificationBell from '../components/admin/NotificationBell'
 import DashboardTab from '../components/admin/DashboardTab'
 import ProductsTab from '../components/admin/ProductsTab'
 import OrdersTab from '../components/admin/OrdersTab'
@@ -12,16 +11,21 @@ import DiscountsTab from '../components/admin/DiscountsTab'
 import InventoryTab from '../components/admin/InventoryTab'
 import CategoriesTab from '../components/admin/CategoriesTab'
 import CustomersTab from '../components/admin/CustomersTab'
-import ReportsTab from '../components/admin/ReportsTab'
+import CustomerDetail from '../components/admin/CustomerDetail'
+import ReviewsTab from '../components/admin/ReviewsTab'
+import WishlistTab from '../components/admin/WishlistTab'
 import SettingsTab from '../components/admin/SettingsTab'
+import ReportsTab from '../components/admin/ReportsTab'
 import RightSidebar from '../components/admin/RightSidebar'
 
-const TABS = ['dashboard', 'categories', 'products', 'orders', 'discounts', 'inventory', 'customers', 'reports', 'settings']
+const TABS = ['dashboard', 'categories', 'products', 'orders', 'reviews', 'wishlist', 'discounts', 'inventory', 'customers', 'reports', 'settings']
 
 export default function AdminPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const rawTab = useParams().tab || 'dashboard'
+  const params = useParams()
+  const customerId = params.customerId
+  const rawTab = customerId ? 'customers' : (params.tab || 'dashboard')
   const tab = TABS.includes(rawTab) ? rawTab : 'dashboard'
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function AdminPage() {
     }
   }, [user])
 
-  const tabComponents = { dashboard: DashboardTab, categories: CategoriesTab, products: ProductsTab, orders: OrdersTab, discounts: DiscountsTab, inventory: InventoryTab, customers: CustomersTab, reports: ReportsTab, settings: SettingsTab }
+  const tabComponents = { dashboard: DashboardTab, categories: CategoriesTab, products: ProductsTab, orders: OrdersTab, reviews: ReviewsTab, wishlist: WishlistTab, discounts: DiscountsTab, inventory: InventoryTab, customers: CustomersTab, reports: ReportsTab, settings: SettingsTab }
   const TabComponent = tabComponents[tab]
 
   return (
@@ -51,7 +55,7 @@ export default function AdminPage() {
 
       <div className="lg:flex lg:items-start lg:gap-6">
         <div className="flex-1">
-          <TabComponent />
+          {customerId ? <CustomerDetail userId={Number(customerId)} /> : <TabComponent />}
         </div>
         <RightSidebar onProductAdded={() => { /* refresh UI if needed */ }} />
       </div>
