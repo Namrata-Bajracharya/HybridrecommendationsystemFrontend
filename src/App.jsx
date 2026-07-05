@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
 import { RecommendationProvider } from "./context/RecommendationContext";
+import { SocketProvider } from "./context/SocketContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -81,6 +82,7 @@ export default function App() {
         <CartProvider>
           <WishlistProvider>
             <RecommendationProvider>
+              <SocketProvider>
               <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
               {/* ── Global chrome ── */}
               <Navbar />
@@ -201,6 +203,7 @@ export default function App() {
 
               <Footer />
             </SnackbarProvider>
+            </SocketProvider>
             </RecommendationProvider>
           </WishlistProvider>
         </CartProvider>
