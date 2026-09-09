@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOrders } from '../../hooks/useOrders'
 import { privateAgent } from '../../Requests/AuthRequests'
 import { OrderAPI } from '../../routes/Routes'
+import { useSocket } from '../../context/SocketContext'
 
 const STATUS_LABELS = {
   pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected', packed: 'Packed',
@@ -16,24 +17,56 @@ const STATUS_LABELS = {
   refund_successful: 'Refund Successful',
 }
 
+const PER_PAGE = 20
+
 export default function OrdersTab() {
   const { orders: localOrders } = useOrders()
   const [backendOrders, setBackendOrders] = useState([])
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
   const navigate = useNavigate()
+  const { connected, on } = useSocket()
 
-  const fetchOrders = () => {
+  const fetchOrders = useCallback(() => {
     privateAgent.get(OrderAPI({}).adminAll)
-      .then(r => setBackendOrders(r.data || []))
-      .catch(() => {})
-  }
+      .then(r => {
+        const data = r.data
+        let list = []
+        if (Array.isArray(data)) {
+          list = data
+        } else if (data?.data && Array.isArray(data.data)) {
+          list = data.data
+        } else if (data?.orders && Array.isArray(data.orders)) {
+          list = data.orders
+        }
+        list.sort((a, b) => new Date(b.order_date || b.date || 0) - new Date(a.order_date || a.date || 0))
+        setBackendOrders(list)
+      })
+      .catch((e) => {
+        console.error('OrdersTab fetch failed:', e?.response?.status, e?.message)
+      })
+  }, [])
 
-  useEffect(() => { fetchOrders() }, [])
+  useEffect(() => { fetchOrders() }, [fetchOrders])
+
+  useEffect(() => {
+    if (!connected) return
+    const unsub1 = on("new_order", fetchOrders)
+    const unsub2 = on("order_placed", fetchOrders)
+    const unsub3 = on("order_status", fetchOrders)
+    return () => { unsub1(); unsub2(); unsub3() }
+  }, [connected, on, fetchOrders])
+
+  useEffect(() => {
+    const interval = setInterval(fetchOrders, 15000)
+    return () => clearInterval(interval)
+  }, [fetchOrders])
 
   const allOrders = [...backendOrders, ...localOrders]
   const seen = new Set()
   const merged = allOrders.filter(o => {
-    const key = o.id || o.order_number
+    const key = o?.id || o?.order_number
+    if (!key) return true
     if (seen.has(key)) return false
     seen.add(key)
     return true
@@ -44,17 +77,28 @@ export default function OrdersTab() {
   const counts = { all: merged.length }
   Object.keys(STATUS_LABELS).forEach(s => { counts[s] = merged.filter(o => (o.status || 'Processing') === s).length })
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+  const safePage = Math.min(page, totalPages)
+  const startIdx = (safePage - 1) * PER_PAGE
+  const pageItems = filtered.slice(startIdx, startIdx + PER_PAGE)
+
+  const handleFilter = (s) => { setFilter(s); setPage(1) }
+
   return (
     <div>
-      <div className="flex gap-2 mb-6 flex-wrap">
+      <div className="flex gap-2 mb-3 flex-wrap">
         {allStatuses.map(s => (
           <button key={s} className={`text-xs px-3 py-1.5 rounded-full transition ${filter === s ? 'bg-dark text-cream' : 'bg-white text-muted hover:bg-cream'}`}
-            onClick={() => setFilter(s)}>{s === 'all' ? `All (${counts.all})` : `${STATUS_LABELS[s] || s} (${counts[s] || 0})`}</button>))}
+            onClick={() => handleFilter(s)}>{s === 'all' ? `All (${counts.all})` : `${STATUS_LABELS[s] || s} (${counts[s] || 0})`}</button>))}
       </div>
 
-      {filtered.length === 0 ? <p className="text-muted text-sm">No orders found.</p> : (
-        <div className="space-y-3">
-          {[...filtered].reverse().map(o => {
+      <div className="flex items-center gap-2 mb-4">
+        <p className="text-xs text-muted">{backendOrders.length} orders from server{!connected ? ' (socket disconnected)' : ''}</p>
+        <button onClick={fetchOrders} className="text-xs text-accent hover:underline ml-auto">Refresh</button>
+      </div>
+
+      {filtered.length === 0 ? <p className="text-muted text-sm">No orders found.</p> : (<>        <div className="space-y-3">
+          {pageItems.map(o => {
             const status = o.status || 'Processing'
             return (
               <div key={o.id || o.order_number}
@@ -86,7 +130,34 @@ export default function OrdersTab() {
             )
           })}
         </div>
-      )}
+
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-cream-alt">
+          <p className="text-xs text-muted">Showing {startIdx + 1}–{Math.min(startIdx + PER_PAGE, filtered.length)} of {filtered.length}</p>
+          <div className="flex items-center gap-1.5">
+            <button disabled={safePage <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-2.5 py-1 rounded-lg text-xs bg-cream text-dark disabled:opacity-40 hover:bg-cream-alt transition">
+              Prev
+            </button>
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              const start = Math.max(1, Math.min(safePage - 3, totalPages - 6))
+              const p = start + i
+              if (p > totalPages) return null
+              return (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`w-7 h-7 rounded-lg text-xs font-medium transition ${p === safePage ? 'bg-dark text-cream' : 'bg-cream text-dark hover:bg-cream-alt'}`}>
+                  {p}
+                </button>
+              )
+            })}
+            <button disabled={safePage >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-2.5 py-1 rounded-lg text-xs bg-cream text-dark disabled:opacity-40 hover:bg-cream-alt transition">
+              Next
+            </button>
+          </div>
+        </div>
+      </>)}
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useSnackbar } from 'notistack'
 import { privateAgent } from '../../Requests/AuthRequests'
 import { OrderAPI } from '../../routes/Routes'
 
 export default function RejectOrderModal({ orderId, orderNumber, onClose, onRejected }) {
+  const { enqueueSnackbar } = useSnackbar()
   const [reasons, setReasons] = useState([])
   const [selected, setSelected] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,7 +21,7 @@ export default function RejectOrderModal({ orderId, orderNumber, onClose, onReje
       onRejected()
       onClose()
     } catch (e) {
-      alert('Failed to reject order')
+      enqueueSnackbar('Failed to reject order', { variant: 'error' })
     } finally {
       setLoading(false)
     }

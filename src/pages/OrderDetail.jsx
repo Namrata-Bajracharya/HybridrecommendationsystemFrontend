@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useSnackbar } from 'notistack'
 import { useAuth } from '../context/AuthContext'
 import { privateAgent } from '../Requests/AuthRequests'
 import { OrderAPI } from '../routes/Routes'
@@ -38,6 +39,7 @@ export default function OrderDetail() {
   const { id } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { enqueueSnackbar } = useSnackbar()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -128,14 +130,14 @@ export default function OrderDetail() {
     try {
       await privateAgent.patch(OrderAPI({ id }).advance, { status: next })
       fetchOrder()
-    } catch (e) { alert('Failed to update status') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to update status', { variant: 'error' }) }
   }
 
   const handleAccept = async () => {
     try {
       await privateAgent.patch(OrderAPI({ id }).accept)
       fetchOrder()
-    } catch (e) { alert('Failed to accept order') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to accept order', { variant: 'error' }) }
   }
 
   const handleReject = () => setShowRejectModal(true)
@@ -146,35 +148,35 @@ export default function OrderDetail() {
     try {
       await privateAgent.patch(OrderAPI({ id }).cancel, { reason, cancelled_by: 'admin' })
       fetchOrder()
-    } catch (e) { alert('Failed to cancel order') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to cancel order', { variant: 'error' }) }
   }
 
-  const handleRefundAccept = async () => {
+  const handleAcceptRefund = async () => {
     try {
-      await privateAgent.patch(OrderAPI({ id }).refundAccept)
+      await privateAgent.patch(OrderAPI({ id }).acceptRefund)
       fetchOrder()
-    } catch (e) { alert('Failed to accept refund') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to accept refund', { variant: 'error' }) }
   }
 
-  const handleItemRetrievedFromCustomer = async () => {
+  const handleMarkRetrieved = async () => {
     try {
-      await privateAgent.patch(OrderAPI({ id }).refundItemRetrievedFromCustomer)
+      await privateAgent.patch(OrderAPI({ id }).markItemRetrieved)
       fetchOrder()
-    } catch (e) { alert('Failed to mark item retrieved') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to mark item retrieved', { variant: 'error' }) }
   }
 
-  const handleItemRetrievedByAdmin = async () => {
+  const handleMarkAdminRetrieval = async () => {
     try {
-      await privateAgent.patch(OrderAPI({ id }).refundItemRetrievedByAdmin)
+      await privateAgent.patch(OrderAPI({ id }).markAdminRetrieval)
       fetchOrder()
-    } catch (e) { alert('Failed to mark admin retrieval') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to mark admin retrieval', { variant: 'error' }) }
   }
 
   const handleCompleteRefund = async () => {
     try {
-      await privateAgent.patch(OrderAPI({ id }).refundComplete, { proof_image: null })
+      await privateAgent.patch(OrderAPI({ id }).completeRefund)
       fetchOrder()
-    } catch (e) { alert('Failed to complete refund') }
+    } catch (e) { enqueueSnackbar(e.response?.data?.detail || 'Failed to complete refund', { variant: 'error' }) }
   }
 
   const items = order.order_items || order.items || []

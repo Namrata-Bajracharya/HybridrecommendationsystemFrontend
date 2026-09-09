@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSnackbar } from 'notistack'
 import { privateAgent } from '../Requests/AuthRequests'
 import { OrderAPI } from '../routes/Routes'
 import DraggableUpload from './DraggableUpload'
@@ -22,6 +23,7 @@ function readFileAsDataURL(file) {
 }
 
 export default function RefundRequestModal({ orderId, orderNumber, onClose, onSubmitted }) {
+  const { enqueueSnackbar } = useSnackbar()
   const [reason, setReason] = useState('')
   const [description, setDescription] = useState('')
   const [proofFiles, setProofFiles] = useState([])
@@ -44,7 +46,7 @@ export default function RefundRequestModal({ orderId, orderNumber, onClose, onSu
       onSubmitted()
       onClose()
     } catch (e) {
-      alert('Failed to submit refund request')
+      enqueueSnackbar('Failed to submit refund request', { variant: 'error' })
     } finally {
       setSubmitting(false)
     }

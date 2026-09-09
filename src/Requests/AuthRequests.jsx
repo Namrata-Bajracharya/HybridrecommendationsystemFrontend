@@ -32,6 +32,7 @@ privateAgent.interceptors.request.use(
 privateAgent.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (axios.isCancel(error)) return Promise.reject(error);
     console.error('Response Error:', error);
     const originalRequest = error.config;
     

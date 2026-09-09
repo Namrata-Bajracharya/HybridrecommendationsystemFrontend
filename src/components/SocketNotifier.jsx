@@ -39,6 +39,13 @@ export default function SocketNotifier() {
       })
     })
 
+    const unsubNewOrder = on('new_order', (data) => {
+      if (user?.role !== 'admin') return
+      enqueueSnackbar(`New Order #${data.order_number} from ${data.customer_name || 'a customer'} — Rs ${(data.total || 0).toLocaleString()}`, {
+        variant: 'success', autoHideDuration: 5000,
+      })
+    })
+
     const unsub2 = on('order_placed', (data) => {
       if (user?.role !== 'admin') return
       enqueueSnackbar(`Order #${data.order_number} placed successfully!`, {
@@ -70,7 +77,7 @@ export default function SocketNotifier() {
       }
     })
 
-    return () => { unsub1(); unsub2(); unsub3() }
+    return () => { unsub1(); unsubNewOrder(); unsub2(); unsub3() }
   }, [connected, on, enqueueSnackbar, user?.role])
 
   return null

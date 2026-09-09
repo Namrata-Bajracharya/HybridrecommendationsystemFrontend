@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSnackbar } from 'notistack'
 import { privateAgent } from '../../Requests/AuthRequests'
 import { OrderAPI } from '../../routes/Routes'
 import DraggableUpload from '../DraggableUpload'
@@ -12,6 +13,7 @@ function readFileAsDataURL(file) {
 }
 
 export default function AdminRefundPaymentModal({ orderId, orderNumber, onClose, onCompleted }) {
+  const { enqueueSnackbar } = useSnackbar()
   const [proofFiles, setProofFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -30,7 +32,7 @@ export default function AdminRefundPaymentModal({ orderId, orderNumber, onClose,
       onCompleted()
       onClose()
     } catch (e) {
-      alert('Failed to process refund payment')
+      enqueueSnackbar('Failed to process refund payment', { variant: 'error' })
     } finally {
       setSubmitting(false)
     }
